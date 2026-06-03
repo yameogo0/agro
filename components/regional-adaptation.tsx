@@ -4,6 +4,8 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import {
   Globe,
   Thermometer,
@@ -16,6 +18,9 @@ import {
   AlertTriangle,
   CheckCircle,
   Info,
+  Search,
+  MapPin,
+  ChevronRight,
 } from "lucide-react"
 
 interface RegionalAdaptationProps {
@@ -40,7 +45,6 @@ interface RegionData {
 }
 
 export default function RegionalAdaptation({ currentLanguage, userRegion, onRegionChange }: RegionalAdaptationProps) {
-  const [selectedContinent, setSelectedContinent] = useState("Africa")
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("overview")
 
@@ -73,7 +77,7 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
       population: 21904983,
       gdpAgriculture: 38.5,
     },
-    Senegal: {
+    Sénégal: {
       name: "Sénégal",
       flag: "🇸🇳",
       climate: "Sahélien/Soudanien",
@@ -103,27 +107,6 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
     },
   }
 
-  const continents = {
-    Africa: {
-      name: "Afrique",
-      countries: Object.keys(regions).filter((country) =>
-        ["Burkina Faso", "Mali", "Senegal", "Niger"].includes(country),
-      ),
-    },
-    Asia: {
-      name: "Asie",
-      countries: ["China", "India", "Japan", "Thailand"],
-    },
-    Europe: {
-      name: "Europe",
-      countries: ["France", "Germany", "Italy", "Spain"],
-    },
-    Americas: {
-      name: "Amériques",
-      countries: ["Brazil", "USA", "Mexico", "Argentina"],
-    },
-  }
-
   const currentRegionData = regions[userRegion] || regions["Burkina Faso"]
 
   const weatherData = {
@@ -140,38 +123,60 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
     ],
   }
 
-  const localServices = [
-    {
-      name: "Coopérative YELEN",
-      type: "Formation",
-      distance: "2.3 km",
-      rating: 4.8,
-      specialties: ["Aviculture", "Maraîchage"],
-    },
-    {
-      name: "Dr. Aminata Traoré",
-      type: "Vétérinaire",
-      distance: "5.1 km",
-      rating: 4.9,
-      specialties: ["Volaille", "Petits ruminants"],
-    },
-    {
-      name: "Marché de Rood-Woko",
-      type: "Marché",
-      distance: "1.8 km",
-      rating: 4.2,
-      specialties: ["Vente intrants", "Équipements"],
-    },
-  ]
-
   const filteredCountries = Object.keys(regions).filter((country) =>
     country.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
   return (
     <div className="space-y-6">
-      {/* Current Region Overview */}
-      <Card className="bg-gradient-to-r from-green-500 to-blue-600 text-white">
+      {/* Sélecteur de région */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-1">Changer de région</label>
+              <select
+                value={userRegion}
+                onChange={(e) => onRegionChange(e.target.value)}
+                className="w-full p-2 border rounded-lg"
+              >
+                {Object.keys(regions).map((region) => (
+                  <option key={region} value={region}>
+                    {regions[region].flag} {region}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Rechercher une région..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
+          {searchQuery && filteredCountries.length > 0 && filteredCountries.length < Object.keys(regions).length && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {filteredCountries.map((country) => (
+                <Button
+                  key={country}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onRegionChange(country)}
+                  className="text-sm"
+                >
+                  {regions[country].flag} {country}
+                </Button>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Vue d'ensemble de la région */}
+      <Card className="bg-gradient-to-r from-green-600 to-blue-700 text-white">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
@@ -188,23 +193,23 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <Thermometer className="h-6 w-6 mx-auto mb-1" />
+            <div className="text-center bg-white/10 rounded-lg p-2">
+              <Thermometer className="h-5 w-5 mx-auto mb-1" />
               <div className="text-lg font-bold">{weatherData.temperature}°C</div>
               <div className="text-xs text-green-100">Température</div>
             </div>
-            <div className="text-center">
-              <Droplets className="h-6 w-6 mx-auto mb-1" />
+            <div className="text-center bg-white/10 rounded-lg p-2">
+              <Droplets className="h-5 w-5 mx-auto mb-1" />
               <div className="text-lg font-bold">{weatherData.humidity}%</div>
               <div className="text-xs text-green-100">Humidité</div>
             </div>
-            <div className="text-center">
-              <Cloud className="h-6 w-6 mx-auto mb-1" />
+            <div className="text-center bg-white/10 rounded-lg p-2">
+              <Cloud className="h-5 w-5 mx-auto mb-1" />
               <div className="text-lg font-bold">{weatherData.rainfall}mm</div>
               <div className="text-xs text-green-100">Précipitations</div>
             </div>
-            <div className="text-center">
-              <Sprout className="h-6 w-6 mx-auto mb-1" />
+            <div className="text-center bg-white/10 rounded-lg p-2">
+              <Sprout className="h-5 w-5 mx-auto mb-1" />
               <div className="text-lg font-bold">{currentRegionData.gdpAgriculture}%</div>
               <div className="text-xs text-green-100">PIB Agricole</div>
             </div>
@@ -212,40 +217,36 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
         </CardContent>
       </Card>
 
-      {/* Regional Tabs */}
+      {/* Onglets */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Aperçu</TabsTrigger>
           <TabsTrigger value="agriculture">Agriculture</TabsTrigger>
-          <TabsTrigger value="services">Services locaux</TabsTrigger>
-          <TabsTrigger value="change">Changer région</TabsTrigger>
+          <TabsTrigger value="info">Informations</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Weather Forecast */}
+        <TabsContent value="overview" className="mt-4 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Prévisions météo */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Sun className="h-5 w-5 mr-2" />
-                  Prévisions météo
+                <CardTitle className="flex items-center gap-2">
+                  <Sun className="h-5 w-5" />
+                  Prévisions 5 jours
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="mb-4">
-                  <div className="text-lg font-semibold mb-2">{weatherData.season}</div>
-                  <div className="grid grid-cols-5 gap-2">
-                    {weatherData.forecast.map((day, index) => (
-                      <div key={index} className="text-center p-2 bg-gray-50 rounded">
-                        <div className="text-xs font-medium">{day.day}</div>
-                        <div className="text-lg my-1">{day.icon}</div>
-                        <div className="text-sm font-bold">{day.temp}°</div>
-                      </div>
-                    ))}
-                  </div>
+                <div className="grid grid-cols-5 gap-2">
+                  {weatherData.forecast.map((day, i) => (
+                    <div key={i} className="text-center p-2 bg-gray-50 rounded-lg">
+                      <div className="text-xs font-medium">{day.day}</div>
+                      <div className="text-xl my-1">{day.icon}</div>
+                      <div className="text-sm font-bold">{day.temp}°</div>
+                    </div>
+                  ))}
                 </div>
-                <div className="bg-blue-50 p-3 rounded-lg">
-                  <div className="flex items-center space-x-2">
+                <div className="mt-4 bg-blue-50 p-3 rounded-lg">
+                  <div className="flex items-center gap-2">
                     <Info className="h-4 w-4 text-blue-600" />
                     <p className="text-sm text-blue-800">Période favorable pour la vaccination des volailles</p>
                   </div>
@@ -253,88 +254,78 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
               </CardContent>
             </Card>
 
-            {/* Regional Challenges */}
+            {/* Défis */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <AlertTriangle className="h-5 w-5 mr-2" />
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
                   Défis régionaux
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {currentRegionData.challenges.map((challenge, index) => (
-                    <div key={index} className="flex items-center space-x-3 p-3 bg-red-50 rounded-lg">
+                <div className="space-y-2">
+                  {currentRegionData.challenges.map((challenge, i) => (
+                    <div key={i} className="flex items-center gap-2 p-2 bg-red-50 rounded-lg">
                       <AlertTriangle className="h-4 w-4 text-red-600" />
-                      <span className="text-sm font-medium">{challenge}</span>
+                      <span className="text-sm">{challenge}</span>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Opportunities */}
+            {/* Opportunités */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <TrendingUp className="h-5 w-5 mr-2" />
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
                   Opportunités
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {currentRegionData.opportunities.map((opportunity, index) => (
-                    <div key={index} className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
+                <div className="space-y-2">
+                  {currentRegionData.opportunities.map((opp, i) => (
+                    <div key={i} className="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
                       <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span className="text-sm font-medium">{opportunity}</span>
+                      <span className="text-sm">{opp}</span>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Languages */}
+            {/* Villes principales */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Globe className="h-5 w-5 mr-2" />
-                  Langues locales
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  Villes principales
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
-                  {currentRegionData.languages.map((language, index) => (
-                    <Badge key={index} variant="outline" className="text-sm">
-                      {language}
-                    </Badge>
+                  {currentRegionData.cities.map((city, i) => (
+                    <Badge key={i} variant="outline">{city}</Badge>
                   ))}
-                </div>
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    L'application est disponible dans toutes ces langues pour une meilleure accessibilité.
-                  </p>
                 </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="agriculture" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <TabsContent value="agriculture" className="mt-4 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Sprout className="h-5 w-5 mr-2" />
+                <CardTitle className="flex items-center gap-2">
+                  <Sprout className="h-5 w-5" />
                   Cultures principales
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {currentRegionData.mainCrops.map((crop, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                      <span className="font-medium">{crop}</span>
-                      <Badge variant="secondary">Adapté au climat</Badge>
-                    </div>
+                <div className="flex flex-wrap gap-2">
+                  {currentRegionData.mainCrops.map((crop, i) => (
+                    <Badge key={i} className="bg-green-100 text-green-800">{crop}</Badge>
                   ))}
                 </div>
               </CardContent>
@@ -342,18 +333,15 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Users className="h-5 w-5 mr-2" />
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
                   Élevage local
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {currentRegionData.livestock.map((animal, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                      <span className="font-medium">{animal}</span>
-                      <Badge variant="secondary">Race locale</Badge>
-                    </div>
+                <div className="flex flex-wrap gap-2">
+                  {currentRegionData.livestock.map((animal, i) => (
+                    <Badge key={i} variant="outline">{animal}</Badge>
                   ))}
                 </div>
               </CardContent>
@@ -367,4 +355,58 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 bg-yellow-50 rounded-lg">
-                  <h4 className="font-semibold text-yellow-800 mb-2">Saison s\
+                  <h4 className="font-semibold text-yellow-800 mb-2">🌞 Saison sèche</h4>
+                  <p className="text-sm text-yellow-700">Novembre - Mai</p>
+                  <p className="text-xs text-yellow-600 mt-1">Récolte du mil et sorgho</p>
+                </div>
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <h4 className="font-semibold text-green-800 mb-2">🌧️ Saison des pluies</h4>
+                  <p className="text-sm text-green-700">Juin - Octobre</p>
+                  <p className="text-xs text-green-600 mt-1">Semis et plantation</p>
+                </div>
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <h4 className="font-semibold text-blue-800 mb-2">🔄 Période de transition</h4>
+                  <p className="text-sm text-blue-700">Mai - Juin</p>
+                  <p className="text-xs text-blue-600 mt-1">Préparation des sols</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="info" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                Informations générales
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between p-2 border-b">
+                <span className="font-medium">Langues parlées:</span>
+                <span>{currentRegionData.languages.join(", ")}</span>
+              </div>
+              <div className="flex justify-between p-2 border-b">
+                <span className="font-medium">Monnaie:</span>
+                <span>{currentRegionData.currency}</span>
+              </div>
+              <div className="flex justify-between p-2 border-b">
+                <span className="font-medium">Population:</span>
+                <span>{currentRegionData.population?.toLocaleString()} habitants</span>
+              </div>
+              <div className="flex justify-between p-2 border-b">
+                <span className="font-medium">PIB Agricole:</span>
+                <span>{currentRegionData.gdpAgriculture}% du PIB total</span>
+              </div>
+              <div className="flex justify-between p-2">
+                <span className="font-medium">Villes principales:</span>
+                <span>{currentRegionData.cities.join(", ")}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
