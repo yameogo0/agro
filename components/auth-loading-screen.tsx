@@ -1,41 +1,101 @@
 "use client";
 
-import { usePiAuth } from "@/contexts/pi-auth-context";
+import { useState, useEffect } from "react";
 
-export function AuthLoadingScreen() {
-  const { authMessage, reinitialize } = usePiAuth();
-  const isError = authMessage.toLowerCase().includes("failed");
+interface AuthLoadingScreenProps {
+  language?: string;
+  message?: string;
+}
+
+export function AuthLoadingScreen({ language = "fr", message }: AuthLoadingScreenProps) {
+  const [progress, setProgress] = useState(0);
+  const [currentMessage, setCurrentMessage] = useState(message || "Initialisation...");
+
+  const messages: Record<string, string[]> = {
+    fr: [
+      "Initialisation de l'application...",
+      "Connexion au réseau Pi...",
+      "Chargement de votre profil...",
+      "Préparation du tableau de bord...",
+    ],
+    en: [
+      "Initializing application...",
+      "Connecting to Pi Network...",
+      "Loading your profile...",
+      "Preparing dashboard...",
+    ],
+    es: [
+      "Inicializando aplicación...",
+      "Conectando a Pi Network...",
+      "Cargando tu perfil...",
+      "Preparando tablero...",
+    ],
+    pt: [
+      "Inicializando aplicação...",
+      "Conectando à Pi Network...",
+      "Carregando seu perfil...",
+      "Preparando painel...",
+    ],
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setProgress(prev => Math.min(prev + Math.random() * 15, 100));
+    }, 400);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const step = Math.floor(progress / 25);
+    const langMessages = messages[language] || messages.fr;
+    setCurrentMessage(langMessages[Math.min(step, langMessages.length - 1)] || langMessages[0]);
+  }, [progress, language]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="max-w-md w-full px-6 text-center space-y-6">
-        <div className="flex justify-center">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-full border-4 border-primary/20" />
-            <div className="absolute inset-0 w-20 h-20 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full text-center">
+        <div className="relative">
+          <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+            <span className="text-3xl text-white animate-pulse">🌾</span>
+          </div>
+          <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center text-xs font-bold text-white animate-bounce">
+            π
           </div>
         </div>
 
-        <div className="space-y-2">
-          <h2 className="text-2xl font-semibold">Pi Network Authentication</h2>
-          <p
-            className={`text-sm ${
-              isError ? "text-destructive" : "text-muted-foreground"
-            }`}
-          >
-            {authMessage}
-          </p>
+        <h2 className="text-xl font-bold bg-gradient-to-r from-green-700 to-blue-700 bg-clip-text text-transparent mb-2">
+          AGRO MULTICENTER HINOS
+        </h2>
+        <p className="text-gray-500 text-sm mb-6">{currentMessage}</p>
+
+        <div className="flex justify-center gap-2 mb-4">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce"></div>
+          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
+          <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: "0.3s" }}></div>
         </div>
 
-        {isError && (
-          <button
-            onClick={reinitialize}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+          <div 
+            className="bg-gradient-to-r from-green-500 to-blue-600 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${progress}%` }}
           >
-            Try Again
-          </button>
-        )}
+            <div className="absolute inset-0 bg-white/20 animate-shimmer" />
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-400 mt-6">Version 2.1.0 • Paiements Pi • Multilingue</p>
       </div>
+
+      <style jsx>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        .animate-shimmer {
+          animation: shimmer 1.5s infinite;
+        }
+      `}</style>
     </div>
   );
 }
