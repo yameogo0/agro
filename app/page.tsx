@@ -1,12 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
 import {
   Home,
   MessageSquare,
@@ -16,12 +12,8 @@ import {
   Globe,
   Users,
   Briefcase,
-  Bell,
-  Search,
-  Menu,
-  X,
-  MapPin,
   BarChart3,
+  MapPin,
 } from "lucide-react"
 
 import Dashboard from "@/components/dashboard"
@@ -35,6 +27,14 @@ import RegionalAdaptation from "@/components/regional-adaptation"
 import LanguageManager from "@/components/language-manager"
 import GeolocationManager from "@/components/geolocation-manager"
 
+import LoginScreen from "@/components/auth/login-screen"
+import RegistrationDialog from "@/components/auth/registration-dialog"
+import Sidebar from "@/components/layout/sidebar"
+import MobileHeader from "@/components/layout/mobile-header"
+import MainHeader from "@/components/layout/main-header"
+
+import type { RegistrationData, NavigationItem } from "@/lib/types/user"
+
 export default function AgroMulticenterApp() {
   const [activeTab, setActiveTab] = useState("home")
   const [currentLanguage, setCurrentLanguage] = useState("fr")
@@ -43,81 +43,7 @@ export default function AgroMulticenterApp() {
   const [showRegistration, setShowRegistration] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(true)
 
-  const [registrationData, setRegistrationData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    country: "",
-    region: "",
-    city: "",
-    profession: "",
-    specialties: [],
-    languages: [],
-    piWalletAddress: "",
-    latitude: null,
-    longitude: null,
-  })
-
-  const worldCountries = [
-    { name: "Afghanistan", code: "AF", flag: "🇦🇫", continent: "Asia" },
-    { name: "Albania", code: "AL", flag: "🇦🇱", continent: "Europe" },
-    { name: "Algeria", code: "DZ", flag: "🇩🇿", continent: "Africa" },
-    { name: "Burkina Faso", code: "BF", flag: "🇧🇫", continent: "Africa" },
-    { name: "Mali", code: "ML", flag: "🇲🇱", continent: "Africa" },
-    { name: "Niger", code: "NE", flag: "🇳🇪", continent: "Africa" },
-    { name: "Senegal", code: "SN", flag: "🇸🇳", continent: "Africa" },
-    { name: "Côte d'Ivoire", code: "CI", flag: "🇨🇮", continent: "Africa" },
-    { name: "Ghana", code: "GH", flag: "🇬🇭", continent: "Africa" },
-    { name: "Nigeria", code: "NG", flag: "🇳🇬", continent: "Africa" },
-    { name: "France", code: "FR", flag: "🇫🇷", continent: "Europe" },
-    { name: "United States", code: "US", flag: "🇺🇸", continent: "North America" },
-    { name: "Brazil", code: "BR", flag: "🇧🇷", continent: "South America" },
-    { name: "India", code: "IN", flag: "🇮🇳", continent: "Asia" },
-    { name: "China", code: "CN", flag: "🇨🇳", continent: "Asia" },
-    // ... autres pays
-  ]
-
-  const professions = [
-    "Agriculteur",
-    "Éleveur",
-    "Vétérinaire",
-    "Agronome",
-    "Transformateur agricole",
-    "Commerçant agricole",
-    "Consultant agricole",
-    "Formateur",
-    "Chercheur",
-    "Coopérative",
-    "ONG",
-    "Autre",
-  ]
-
-  const specialties = [
-    "Aviculture",
-    "Bovins",
-    "Ovins/Caprins",
-    "Pisciculture",
-    "Apiculture",
-    "Maraîchage",
-    "Céréales",
-    "Légumineuses",
-    "Fruits",
-    "Transformation",
-    "Marketing",
-    "Finance agricole",
-  ]
-
-  const availableLanguages = ["Français", "English", "Português", "Dioula", "Mooré", "Haoussa"]
-
-  const handleRegistration = () => {
-    console.log("Données d'inscription:", registrationData)
-    setIsLoggedIn(true)
-    setShowRegistration(false)
-    setUserRegion(registrationData.country)
-  }
-
-  const navigationItems = [
+  const navigationItems = useMemo<NavigationItem[]>(() => [
     { id: "home", label: "Accueil", icon: Home },
     { id: "aviculture", label: "Aviculture", icon: Users },
     { id: "services", label: "Services", icon: Briefcase },
@@ -128,344 +54,54 @@ export default function AgroMulticenterApp() {
     { id: "geolocation", label: "Géolocalisation", icon: MapPin },
     { id: "analytics", label: "Analyses", icon: BarChart3 },
     { id: "settings", label: "Paramètres", icon: Settings },
-  ]
+  ], [])
+
+  const handleRegistration = (data: RegistrationData) => {
+    console.log("[v0] Registration data:", data)
+    setIsLoggedIn(true)
+    setShowRegistration(false)
+    setUserRegion(data.country)
+  }
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl text-white font-bold">🌾</span>
-            </div>
-            <CardTitle className="text-2xl font-bold text-gray-900">AGRO MULTICENTER HINOS</CardTitle>
-            <p className="text-gray-600">Plateforme agricole mondiale</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => setIsLoggedIn(true)}>
-              Se connecter avec Pi Network
-            </Button>
-            <Button variant="outline" className="w-full bg-transparent" onClick={() => setShowRegistration(true)}>
-              Créer un compte
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Registration Dialog */}
-        <Dialog open={showRegistration} onOpenChange={setShowRegistration}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Inscription à Agro Multicenter Hinos</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="firstName">Prénom</Label>
-                  <Input
-                    id="firstName"
-                    value={registrationData.firstName}
-                    onChange={(e) => setRegistrationData({ ...registrationData, firstName: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="lastName">Nom</Label>
-                  <Input
-                    id="lastName"
-                    value={registrationData.lastName}
-                    onChange={(e) => setRegistrationData({ ...registrationData, lastName: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={registrationData.email}
-                  onChange={(e) => setRegistrationData({ ...registrationData, email: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="phone">Téléphone</Label>
-                <Input
-                  id="phone"
-                  value={registrationData.phone}
-                  onChange={(e) => setRegistrationData({ ...registrationData, phone: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="country">Pays</Label>
-                <Select
-                  value={registrationData.country}
-                  onValueChange={(value) => setRegistrationData({ ...registrationData, country: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez votre pays" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {worldCountries.map((country) => (
-                      <SelectItem key={country.code} value={country.name}>
-                        <div className="flex items-center space-x-2">
-                          <span>{country.flag}</span>
-                          <span>{country.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="geolocation">Géolocalisation (Obligatoire)</Label>
-                <div className="space-y-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full bg-transparent"
-                    onClick={() => {
-                      if (navigator.geolocation) {
-                        navigator.geolocation.getCurrentPosition(
-                          (position) => {
-                            console.log("Position:", position.coords.latitude, position.coords.longitude)
-                            setRegistrationData({
-                              ...registrationData,
-                              latitude: position.coords.latitude,
-                              longitude: position.coords.longitude,
-                            })
-                          },
-                          (error) => {
-                            console.error("Erreur de géolocalisation:", error)
-                          },
-                        )
-                      }
-                    }}
-                  >
-                    📍 Détecter ma position automatiquement
-                  </Button>
-                  <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded-lg">
-                    <p className="font-medium text-blue-800 mb-1">Pourquoi la géolocalisation ?</p>
-                    <ul className="space-y-1 text-blue-700">
-                      <li>• Conseils agricoles adaptés à votre climat</li>
-                      <li>• Connexion avec des utilisateurs proches</li>
-                      <li>• Marketplace régional personnalisé</li>
-                      <li>• Alertes météo et agricoles locales</li>
-                    </ul>
-                  </div>
-                  <div className="text-xs text-gray-500 bg-green-50 p-3 rounded-lg">
-                    <p className="font-medium text-green-800 mb-1">🔒 Respect de votre vie privée</p>
-                    <ul className="space-y-1 text-green-700">
-                      <li>• Données chiffrées conformes au RGPD</li>
-                      <li>• Géolocalisation désactivable après inscription</li>
-                      <li>• Transparence totale sur l'utilisation</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="region">Région/État</Label>
-                  <Input
-                    id="region"
-                    value={registrationData.region}
-                    onChange={(e) => setRegistrationData({ ...registrationData, region: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="city">Ville</Label>
-                  <Input
-                    id="city"
-                    value={registrationData.city}
-                    onChange={(e) => setRegistrationData({ ...registrationData, city: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="profession">Profession</Label>
-                <Select
-                  value={registrationData.profession}
-                  onValueChange={(value) => setRegistrationData({ ...registrationData, profession: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez votre profession" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {professions.map((profession) => (
-                      <SelectItem key={profession} value={profession}>
-                        {profession}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label>Spécialités (sélectionnez plusieurs)</Label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {specialties.map((specialty) => (
-                    <label key={specialty} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={registrationData.specialties.includes(specialty)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setRegistrationData({
-                              ...registrationData,
-                              specialties: [...registrationData.specialties, specialty],
-                            })
-                          } else {
-                            setRegistrationData({
-                              ...registrationData,
-                              specialties: registrationData.specialties.filter((s) => s !== specialty),
-                            })
-                          }
-                        }}
-                      />
-                      <span className="text-sm">{specialty}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <Label>Langues parlées</Label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {availableLanguages.slice(0, 12).map((language) => (
-                    <label key={language} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={registrationData.languages.includes(language)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setRegistrationData({
-                              ...registrationData,
-                              languages: [...registrationData.languages, language],
-                            })
-                          } else {
-                            setRegistrationData({
-                              ...registrationData,
-                              languages: registrationData.languages.filter((l) => l !== language),
-                            })
-                          }
-                        }}
-                      />
-                      <span className="text-sm">{language}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="piWallet">Adresse Portefeuille Pi Network</Label>
-                <Input
-                  id="piWallet"
-                  value={registrationData.piWalletAddress}
-                  onChange={(e) => setRegistrationData({ ...registrationData, piWalletAddress: e.target.value })}
-                  placeholder="Votre adresse Pi Network"
-                />
-              </div>
-
-              <Button onClick={handleRegistration} className="w-full bg-green-600 hover:bg-green-700">
-                Créer mon compte
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+      <>
+        <LoginScreen
+          onLoginClick={() => setIsLoggedIn(true)}
+          onRegisterClick={() => setShowRegistration(true)}
+        />
+        <RegistrationDialog
+          open={showRegistration}
+          onOpenChange={setShowRegistration}
+          onRegistration={handleRegistration}
+        />
+      </>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Mobile Header */}
-      <div className="lg:hidden bg-white border-b px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center">
-            <span className="text-white font-bold text-sm">🌾</span>
-          </div>
-          <h1 className="font-bold text-lg">AGRO MC HINOS</h1>
-        </div>
-        <Button variant="ghost" size="sm" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-          {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
-      </div>
+      <MobileHeader isMenuOpen={isMenuOpen} onMenuToggle={() => setIsMenuOpen(!isMenuOpen)} />
 
       <div className="flex">
-        {/* Sidebar */}
-        <div
-          className={`${
-            isMenuOpen ? "translate-x-0" : "-translate-x-full"
-          } lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r transition-transform duration-300 ease-in-out`}
-        >
-          <div className="p-6 border-b">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold">🌾</span>
-              </div>
-              <div>
-                <h1 className="font-bold text-lg">AGRO MULTICENTER</h1>
-                <p className="text-xs text-gray-500">HINOS</p>
-              </div>
-            </div>
-          </div>
+        <Sidebar
+          isOpen={isMenuOpen}
+          onClose={() => setIsMenuOpen(false)}
+          navigationItems={navigationItems}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          userRegion={userRegion}
+        />
 
-          <nav className="p-4 space-y-2">
-            {navigationItems.map((item) => {
-              const Icon = item.icon
-              return (
-                <Button
-                  key={item.id}
-                  variant={activeTab === item.id ? "default" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setActiveTab(item.id)
-                    setIsMenuOpen(false)
-                  }}
-                >
-                  <Icon className="h-4 w-4 mr-3" />
-                  {item.label}
-                </Button>
-              )
-            })}
-          </nav>
-
-          <div className="absolute bottom-4 left-4 right-4">
-            <div className="bg-gradient-to-r from-green-500 to-blue-600 text-white p-3 rounded-lg text-center">
-              <p className="text-sm font-medium">Région actuelle</p>
-              <p className="text-xs">{userRegion}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
         <div className="flex-1 lg:ml-0">
           <div className="p-4 lg:p-6">
-            {/* Header */}
-            <div className="hidden lg:flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">
-                  {navigationItems.find((item) => item.id === activeTab)?.label}
-                </h2>
-                <p className="text-gray-600">Bienvenue sur votre plateforme agricole mondiale</p>
-              </div>
-              <div className="flex items-center space-x-4">
-                <Button variant="outline" size="sm">
-                  <Bell className="h-4 w-4 mr-2" />
-                  Notifications
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Search className="h-4 w-4 mr-2" />
-                  Rechercher
-                </Button>
-                <LanguageManager currentLanguage={currentLanguage} onLanguageChange={setCurrentLanguage} />
-              </div>
-            </div>
+            <MainHeader
+              activeTab={activeTab}
+              navigationItems={navigationItems}
+              currentLanguage={currentLanguage}
+              onLanguageChange={setCurrentLanguage}
+            />
 
-            {/* Tab Content */}
             <div className="space-y-6">
               {activeTab === "home" && (
                 <Dashboard currentLanguage={currentLanguage} userRegion={userRegion} onTabChange={setActiveTab} />
@@ -509,7 +145,7 @@ export default function AgroMulticenterApp() {
                   <CardContent className="space-y-4">
                     <div className="text-center py-12">
                       <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">Module d'Analyses</h3>
+                      <h3 className="text-lg font-semibold mb-2">Module d&apos;Analyses</h3>
                       <p className="text-gray-600 mb-4">
                         Visualisez vos données agricoles, analysez vos performances et optimisez vos rendements.
                       </p>
@@ -522,7 +158,7 @@ export default function AgroMulticenterApp() {
               {activeTab === "settings" && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Paramètres de l'application</CardTitle>
+                    <CardTitle>Paramètres de l&apos;application</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-4">
@@ -562,7 +198,6 @@ export default function AgroMulticenterApp() {
         </div>
       </div>
 
-      {/* Mobile Navigation */}
       <MobileNavigation
         activeTab={activeTab}
         onTabChange={setActiveTab}
