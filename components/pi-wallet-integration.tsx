@@ -30,7 +30,6 @@ import {
 } from "lucide-react"
 import { usePiAuth } from "@/contexts/pi-auth-context"
 import { useOnlineStatus } from "@/hooks/use-online-status"
-import { PiPaymentButton } from "@/components/pi-payment-button"
 import { showToast } from "@/lib/utils"
 
 interface PiWalletIntegrationProps {
@@ -98,6 +97,16 @@ export default function PiWalletIntegration({ currentLanguage, userRegion }: PiW
       status: "pending",
       txHash: "ghi789jkl012",
     },
+    {
+      id: "tx004",
+      type: "sent",
+      amount: 0.005,
+      to: "Marché Local",
+      description: "Achat d'aliments",
+      date: "2024-01-25T16:45:00Z",
+      status: "completed",
+      txHash: "jkl012mno345",
+    },
   ])
 
   const { isAuthenticated, userData } = usePiAuth()
@@ -122,7 +131,6 @@ export default function PiWalletIntegration({ currentLanguage, userRegion }: PiW
   const refreshWallet = useCallback(async () => {
     setIsRefreshing(true)
     try {
-      // Simuler l'appel API
       await new Promise(resolve => setTimeout(resolve, 800))
       setWalletData(prev => ({
         ...prev,
@@ -151,7 +159,6 @@ export default function PiWalletIntegration({ currentLanguage, userRegion }: PiW
   const confirmSend = async () => {
     const amount = parseFloat(sendAmount)
     
-    // Simuler l'envoi
     const newTransaction: Transaction = {
       id: `tx${Date.now()}`,
       type: "sent",
@@ -235,6 +242,12 @@ export default function PiWalletIntegration({ currentLanguage, userRegion }: PiW
                   Hors ligne
                 </Badge>
               )}
+              {isOnline && (
+                <Badge variant="outline" className="bg-green-500/20 text-green-200 border-green-500/30">
+                  <Wifi className="h-3 w-3 mr-1" />
+                  En ligne
+                </Badge>
+              )}
             </div>
           </div>
 
@@ -310,7 +323,6 @@ export default function PiWalletIntegration({ currentLanguage, userRegion }: PiW
         {/* Onglet Portefeuille */}
         <TabsContent value="wallet" className="mt-6 space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Actions rapides */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -323,22 +335,21 @@ export default function PiWalletIntegration({ currentLanguage, userRegion }: PiW
                   <Send className="h-4 w-4" />
                   Envoyer π
                 </Button>
-                <Button variant="outline" className="w-full gap-2 bg-transparent">
+                <Button variant="outline" className="w-full gap-2">
                   <QrCode className="h-4 w-4" />
                   Recevoir π (QR Code)
                 </Button>
-                <Button variant="outline" className="w-full gap-2 bg-transparent">
+                <Button variant="outline" className="w-full gap-2">
                   <Plus className="h-4 w-4" />
                   Demander un paiement
                 </Button>
-                <Button variant="outline" className="w-full gap-2 bg-transparent">
+                <Button variant="outline" className="w-full gap-2">
                   <Shield className="h-4 w-4" />
                   Sécurité du portefeuille
                 </Button>
               </CardContent>
             </Card>
 
-            {/* Transactions récentes */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
@@ -390,7 +401,6 @@ export default function PiWalletIntegration({ currentLanguage, userRegion }: PiW
             </Card>
           </div>
 
-          {/* Statistiques */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Card>
               <CardContent className="p-4 text-center">
@@ -474,7 +484,6 @@ export default function PiWalletIntegration({ currentLanguage, userRegion }: PiW
             </CardContent>
           </Card>
 
-          {/* Envoi rapide */}
           <Card>
             <CardHeader>
               <CardTitle>Envoi rapide</CardTitle>
@@ -655,7 +664,7 @@ export default function PiWalletIntegration({ currentLanguage, userRegion }: PiW
                 Confirmer l'envoi
               </h3>
               <button onClick={() => setShowSendConfirm(false)} className="text-gray-400 hover:text-gray-600">
-                ✕
+                <X className="h-5 w-5" />
               </button>
             </div>
             <div className="space-y-3 mb-4">
