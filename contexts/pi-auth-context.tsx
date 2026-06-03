@@ -19,103 +19,76 @@ interface PiAuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   authMessage: string;
-  piAccessToken: string | null;
   userData: LoginDTO | null;
   login: () => Promise<void>;
   logout: () => Promise<void>;
-  reinitialize: () => Promise<void>;
-  error: string | null;
-  isPiAvailable: boolean;
 }
 
 const PiAuthContext = createContext<PiAuthContextType | undefined>(undefined);
-
-const isPiBrowser = (): boolean => {
-  if (typeof window === "undefined") return false;
-  return !!(window.Pi || navigator.userAgent.includes("PiBrowser"));
-};
 
 export function PiAuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [authMessage, setAuthMessage] = useState("Initialisation...");
-  const [piAccessToken, setPiAccessToken] = useState<string | null>(null);
   const [userData, setUserData] = useState<LoginDTO | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isPiAvailable, setIsPiAvailable] = useState(false);
 
-  const isDevelopment = process.env.NODE_ENV === "development";
+  useEffect(() => {
+    // Mode démo : connexion automatique après 800ms
+    const timer = setTimeout(() => {
+      console.log("🎮 Mode démo activé");
+      const demoUser: LoginDTO = {
+        id: "demo-123",
+        username: "Agriculteur_Demo",
+        credits_balance: 125.5,
+        terms_accepted: true,
+        email: "demo@agromc.com",
+        region: "Burkina Faso",
+        verified: true,
+        walletAddress: "GCKFBEIYTKQTIQ7VIN54JHKOQ2QZSMH6APPQPLZX2BG4O6JJZWRBTPI7",
+      };
+      setUserData(demoUser);
+      setIsAuthenticated(true);
+      setAuthMessage("Mode démo - Connecté");
+      setIsLoading(false);
+    }, 800);
 
-  const activateDemoMode = () => {
-    console.log("🎮 Mode démo activé");
-    const demoUser: LoginDTO = {
-      id: "demo-1",
-      username: "Agriculteur_Demo",
-      credits_balance: 100,
-      terms_accepted: true,
-      email: "demo@agromc.com",
-      region: "Burkina Faso",
-      verified: true,
-      walletAddress: "demo-wallet",
-    };
-    setUserData(demoUser);
-    setPiAccessToken("demo-token");
-    setIsAuthenticated(true);
-    setAuthMessage("Mode démo");
-    setError(null);
-    setIsLoading(false);
-  };
+    return () => clearTimeout(timer);
+  }, []);
 
   const login = async () => {
-    setError(null);
-    setAuthMessage("Authentification...");
     setIsLoading(true);
-    try {
-      const piAvailable = isPiBrowser();
-      setIsPiAvailable(piAvailable);
-      if (!piAvailable && !isDevelopment) {
-        throw new Error("Veuillez ouvrir dans Pi Browser");
-      }
-      await new Promise(resolve => setTimeout(resolve, 500));
-      activateDemoMode();
-    } catch (err: any) {
-      console.error("Login error:", err);
-      setError(err.message);
-      setAuthMessage("Échec de l'authentification");
+    setAuthMessage("Authentification...");
+    // Simuler une authentification Pi
+    setTimeout(() => {
+      const demoUser: LoginDTO = {
+        id: "demo-" + Date.now(),
+        username: "Agriculteur_Pi",
+        credits_balance: 100,
+        terms_accepted: true,
+        region: "Burkina Faso",
+        verified: true,
+      };
+      setUserData(demoUser);
+      setIsAuthenticated(true);
+      setAuthMessage("Connecté avec succès !");
       setIsLoading(false);
-    }
+    }, 1000);
   };
 
   const logout = async () => {
     setUserData(null);
-    setPiAccessToken(null);
     setIsAuthenticated(false);
-    setError(null);
     setAuthMessage("Déconnecté");
     setIsLoading(false);
   };
-
-  const reinitialize = async () => {
-    await logout();
-    await login();
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(activateDemoMode, 500);
-    return () => clearTimeout(timer);
-  }, []);
 
   const value: PiAuthContextType = {
     isAuthenticated,
     isLoading,
     authMessage,
-    piAccessToken,
     userData,
     login,
     logout,
-    reinitialize,
-    error,
-    isPiAvailable,
   };
 
   return <PiAuthContext.Provider value={value}>{children}</PiAuthContext.Provider>;
