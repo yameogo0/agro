@@ -27,7 +27,7 @@ interface PiAuthResult {
 
 declare global {
   interface Window {
-    Pi: {
+    Pi?: {
       init: (config: { version: string; sandbox?: boolean }) => Promise<void>;
       authenticate: (scopes: string[]) => Promise<PiAuthResult>;
     };
@@ -36,6 +36,7 @@ declare global {
 
 interface PiAuthContextType {
   isAuthenticated: boolean;
+  isLoading: boolean;
   authMessage: string;
   piAccessToken: string | null;
   userData: LoginDTO | null;
@@ -48,7 +49,8 @@ const loadPiSDK = (): Promise<void> => {
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
     if (!PI_NETWORK_CONFIG.SDK_URL) {
-      throw new Error("SDK URL is not set");
+      reject(new Error("SDK URL is not set"));
+      return;
     }
     script.src = PI_NETWORK_CONFIG.SDK_URL;
     script.async = true;
@@ -69,15 +71,21 @@ const loadPiSDK = (): Promise<void> => {
 
 export function PiAuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authMessage, setAuthMessage] = useState("Initializing Pi Network...");
+  const [isLoading, setIsLoading] = useState(true);
+  const [authMessage, setAuthMessage] = useState("Initialisation de Pi Network...");
   const [piAccessToken, setPiAccessToken] = useState<string | null>(null);
   const [userData, setUserData] = useState<LoginDTO | null>(null);
 
   const authenticateAndLogin = async (): Promise<void> => {
-    setAuthMessage("Authenticating with Pi Network...");
+    setAuthMessage("Authentification avec Pi Network...");
+    
+    if (!window.Pi) {
+      throw new Error("Pi SDK not available");
+    }
+    
     const piAuthResult = await window.Pi.authenticate(["username"]);
 
-    setAuthMessage("Logging in to backend...");
+    setAuthMessage("Connexion au serveur...");
     const loginRes = await api.post<LoginDTO>(BACKEND_URLS.LOGIN, {
       pi_auth_token: piAuthResult.accessToken,
     });
@@ -92,9 +100,11 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
 
   const initializePiAndAuthenticate = async () => {
     try {
-      setAuthMessage("Loading Pi Network SDK...");
+      setAuthMessage("Chargement du SDK Pi Network...");
+      setIsLoading(true);
 
-      // Only load if not already loaded
+      if (typeof window === "undefined") return;
+
       if (typeof window.Pi === "undefined") {
         await loadPiSDK();
       }
@@ -103,7 +113,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
         throw new Error("Pi object not available after script load");
       }
 
-      setAuthMessage("Initializing Pi Network...");
+      setAuthMessage("Initialisation de Pi Network...");
       await window.Pi.init({
         version: "2.0",
         sandbox: PI_NETWORK_CONFIG.SANDBOX,
@@ -112,11 +122,13 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       await authenticateAndLogin();
 
       setIsAuthenticated(true);
+      setAuthMessage("Authentifié avec succès !");
     } catch (err) {
       console.error("❌ Pi Network initialization failed:", err);
-      setAuthMessage(
-        "Failed to authenticate or login. Please refresh and try again."
-      );
+      setAuthMessage("Échec de l'authentification. Veuillez rafraîchir.");
+      setIsAuthenticated(false);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -126,6 +138,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
 
   const value: PiAuthContextType = {
     isAuthenticated,
+    isLoading,
     authMessage,
     piAccessToken,
     userData,
@@ -137,18 +150,6 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * Hook to access Pi Network authentication state and user data
- *
- * Must be used within a component wrapped by PiAuthProvider.
- * Provides read-only access to authentication state and user data.
- *
- * @returns {PiAuthContextType} Authentication state and methods
- * @throws {Error} If used outside of PiAuthProvider
- *
- * @example
- * const { piAccessToken, userData, isAuthenticated, reinitialize } = usePiAuth();
- */
 export function usePiAuth() {
   const context = useContext(PiAuthContext);
   if (context === undefined) {
