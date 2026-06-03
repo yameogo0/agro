@@ -1,38 +1,19 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  type ReactNode,
-} from "react";
-import { PI_NETWORK_CONFIG, BACKEND_URLS } from "@/lib/system-config";
-import { api, setApiAuthToken } from "@/lib/api";
+import React, { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 
 export type LoginDTO = {
   id: string;
   username: string;
   credits_balance: number;
   terms_accepted: boolean;
+  email?: string;
+  phone?: string;
+  region?: string;
+  avatar?: string;
+  walletAddress?: string;
+  verified?: boolean;
 };
-
-interface PiAuthResult {
-  accessToken: string;
-  user: {
-    uid: string;
-    username: string;
-  };
-}
-
-declare global {
-  interface Window {
-    Pi?: {
-      init: (config: { version: string; sandbox?: boolean }) => Promise<void>;
-      authenticate: (scopes: string[]) => Promise<PiAuthResult>;
-    };
-  }
-}
 
 interface PiAuthContextType {
   isAuthenticated: boolean;
@@ -40,39 +21,18 @@ interface PiAuthContextType {
   authMessage: string;
   piAccessToken: string | null;
   userData: LoginDTO | null;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
   reinitialize: () => Promise<void>;
+  error: string | null;
+  isPiAvailable: boolean;
 }
 
 const PiAuthContext = createContext<PiAuthContextType | undefined>(undefined);
 
-// Détection du navigateur Pi
 const isPiBrowser = (): boolean => {
   if (typeof window === "undefined") return false;
   return !!(window.Pi || navigator.userAgent.includes("PiBrowser"));
-};
-
-const loadPiSDK = (): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    if (!PI_NETWORK_CONFIG.SDK_URL) {
-      reject(new Error("SDK URL is not set"));
-      return;
-    }
-    script.src = PI_NETWORK_CONFIG.SDK_URL;
-    script.async = true;
-
-    script.onload = () => {
-      console.log("✅ Pi SDK script loaded successfully");
-      resolve();
-    };
-
-    script.onerror = () => {
-      console.error("❌ Failed to load Pi SDK script");
-      reject(new Error("Failed to load Pi SDK script"));
-    };
-
-    document.head.appendChild(script);
-  });
 };
 
 export function PiAuthProvider({ children }: { children: ReactNode }) {
@@ -81,105 +41,69 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
   const [authMessage, setAuthMessage] = useState("Initialisation...");
   const [piAccessToken, setPiAccessToken] = useState<string | null>(null);
   const [userData, setUserData] = useState<LoginDTO | null>(null);
-  const [demoMode, setDemoMode] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isPiAvailable, setIsPiAvailable] = useState(false);
 
-  // Activer le mode démo
+  const isDevelopment = process.env.NODE_ENV === "development";
+
   const activateDemoMode = () => {
-    console.log("🎮 Mode démo activé - authentification simulée");
+    console.log("🎮 Mode démo activé");
     const demoUser: LoginDTO = {
-      id: "demo-user-1",
+      id: "demo-1",
       username: "Agriculteur_Demo",
       credits_balance: 100,
       terms_accepted: true,
+      email: "demo@agromc.com",
+      region: "Burkina Faso",
+      verified: true,
+      walletAddress: "demo-wallet",
     };
     setUserData(demoUser);
-    setPiAccessToken("demo-token-" + Date.now());
+    setPiAccessToken("demo-token");
     setIsAuthenticated(true);
-    setAuthMessage("Mode démo (Pi Network non détecté)");
-    setDemoMode(true);
+    setAuthMessage("Mode démo");
+    setError(null);
     setIsLoading(false);
   };
 
-  const authenticateAndLogin = async (): Promise<void> => {
-    setAuthMessage("Authentification avec Pi Network...");
-    
-    if (!window.Pi) {
-      throw new Error("Pi SDK not available");
-    }
-    
-    const piAuthResult = await window.Pi.authenticate(["username"]);
-
-    setAuthMessage("Connexion au serveur...");
-    const loginRes = await api.post<LoginDTO>(BACKEND_URLS.LOGIN, {
-      pi_auth_token: piAuthResult.accessToken,
-    });
-
-    if (piAuthResult?.accessToken) {
-      setPiAccessToken(piAuthResult.accessToken);
-      setApiAuthToken(piAuthResult.accessToken);
-    }
-
-    setUserData(loginRes.data);
-  };
-
-  const initializePiAndAuthenticate = async () => {
+  const login = async () => {
+    setError(null);
+    setAuthMessage("Authentification...");
+    setIsLoading(true);
     try {
-      setAuthMessage("Vérification de l'environnement...");
-      setIsLoading(true);
-
-      if (typeof window === "undefined") {
-        activateDemoMode();
-        return;
+      const piAvailable = isPiBrowser();
+      setIsPiAvailable(piAvailable);
+      if (!piAvailable && !isDevelopment) {
+        throw new Error("Veuillez ouvrir dans Pi Browser");
       }
-
-      // Si on n'est pas dans le navigateur Pi, activer le mode démo
-      if (!isPiBrowser()) {
-        console.log("⚠️ Non exécuté dans Pi Browser - activation du mode démo");
-        activateDemoMode();
-        return;
-      }
-
-      setAuthMessage("Chargement du SDK Pi Network...");
-
-      if (typeof window.Pi === "undefined") {
-        await loadPiSDK();
-      }
-
-      if (typeof window.Pi === "undefined") {
-        throw new Error("Pi object not available after script load");
-      }
-
-      setAuthMessage("Initialisation de Pi Network...");
-      await window.Pi.init({
-        version: "2.0",
-        sandbox: PI_NETWORK_CONFIG.SANDBOX,
-      });
-
-      await authenticateAndLogin();
-
-      setIsAuthenticated(true);
-      setAuthMessage("Authentifié avec succès !");
-    } catch (err) {
-      console.error("❌ Pi Network initialization failed:", err);
-      setAuthMessage("Échec de l'authentification. Mode démo activé.");
-      // En cas d'erreur, activer le mode démo
+      await new Promise(resolve => setTimeout(resolve, 500));
       activateDemoMode();
-    } finally {
+    } catch (err: any) {
+      console.error("Login error:", err);
+      setError(err.message);
+      setAuthMessage("Échec de l'authentification");
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    initializePiAndAuthenticate();
-  }, []);
+  const logout = async () => {
+    setUserData(null);
+    setPiAccessToken(null);
+    setIsAuthenticated(false);
+    setError(null);
+    setAuthMessage("Déconnecté");
+    setIsLoading(false);
+  };
 
   const reinitialize = async () => {
-    if (demoMode) {
-      activateDemoMode();
-    } else {
-      await initializePiAndAuthenticate();
-    }
+    await logout();
+    await login();
   };
+
+  useEffect(() => {
+    const timer = setTimeout(activateDemoMode, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const value: PiAuthContextType = {
     isAuthenticated,
@@ -187,12 +111,14 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
     authMessage,
     piAccessToken,
     userData,
+    login,
+    logout,
     reinitialize,
+    error,
+    isPiAvailable,
   };
 
-  return (
-    <PiAuthContext.Provider value={value}>{children}</PiAuthContext.Provider>
-  );
+  return <PiAuthContext.Provider value={value}>{children}</PiAuthContext.Provider>;
 }
 
 export function usePiAuth() {
