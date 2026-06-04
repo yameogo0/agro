@@ -217,9 +217,9 @@ const translations = {
 // Données météo par région
 const regionWeather: Record<string, Partial<WeatherData>> = {
   "Burkina Faso": { temperature: 32, condition: "Ensoleillé", icon: "☀️", humidity: 45, windSpeed: 12, uvIndex: 8 },
-  "Mali": { temperature: 33, condition: "Ensoleillé", icon: "☀️", humidity: 38, windSpeed: 14, uvIndex: 9 },
-  "Sénégal": { temperature: 28, condition: "Nuageux", icon: "⛅", humidity: 65, windSpeed: 10, uvIndex: 6 },
-  "Niger": { temperature: 36, condition: "Ensoleillé", icon: "☀️", humidity: 35, windSpeed: 16, uvIndex: 10 },
+  Mali: { temperature: 33, condition: "Ensoleillé", icon: "☀️", humidity: 38, windSpeed: 14, uvIndex: 9 },
+  Sénégal: { temperature: 28, condition: "Nuageux", icon: "⛅", humidity: 65, windSpeed: 10, uvIndex: 6 },
+  Niger: { temperature: 36, condition: "Ensoleillé", icon: "☀️", humidity: 35, windSpeed: 16, uvIndex: 10 },
 }
 
 export default function Dashboard({ currentLanguage, userRegion, onTabChange }: DashboardProps) {
@@ -273,12 +273,13 @@ export default function Dashboard({ currentLanguage, userRegion, onTabChange }: 
     { id: "3", name: "Ibrahim Sawadogo", distance: 8.7, specialty: "Céréales", avatar: "IS", online: true, rating: 4.6, verified: false, products: 8 },
   ])
 
+  // ✅ PRIX CORRIGÉS EN Pi (π)
   const [localProducts] = useState<LocalProduct[]>([
-    { id: "1", name: "Mangues Kent", price: 500, unit: "kg", seller: "Fatou Kaboré", distance: 1.8, image: "🥭", available: true, category: "fruits", inStock: 50 },
-    { id: "2", name: "Engrais NPK", price: 25000, unit: "sac", seller: "Coopérative YELEN", distance: 3.2, image: "🌾", available: true, category: "intrants", inStock: 25 },
-    { id: "3", name: "Poules pondeuses", price: 3500, unit: "unité", seller: "Moussa Koné", distance: 6.5, image: "🐔", available: false, category: "animaux", inStock: 0 },
-    { id: "4", name: "Semences maïs", price: 8000, unit: "kg", seller: "INERA", distance: 4.2, image: "🌽", available: true, category: "semences", inStock: 100 },
-    { id: "5", name: "Tomates fraîches", price: 300, unit: "kg", seller: "Mariam Diallo", distance: 2.1, image: "🍅", available: true, category: "legumes", inStock: 30 },
+    { id: "1", name: "Mangues Kent", price: 0.5, unit: "kg", seller: "Fatou Kaboré", distance: 1.8, image: "🥭", available: true, category: "fruits", inStock: 50 },
+    { id: "2", name: "Engrais NPK", price: 25, unit: "sac", seller: "Coopérative YELEN", distance: 3.2, image: "🌾", available: true, category: "intrants", inStock: 25 },
+    { id: "3", name: "Poules pondeuses", price: 3.5, unit: "unité", seller: "Moussa Koné", distance: 6.5, image: "🐔", available: false, category: "animaux", inStock: 0 },
+    { id: "4", name: "Semences maïs", price: 8, unit: "kg", seller: "INERA", distance: 4.2, image: "🌽", available: true, category: "semences", inStock: 100 },
+    { id: "5", name: "Tomates fraîches", price: 0.3, unit: "kg", seller: "Mariam Diallo", distance: 2.1, image: "🍅", available: true, category: "legumes", inStock: 30 },
   ])
 
   const [activities] = useState<Activity[]>([
@@ -483,7 +484,44 @@ export default function Dashboard({ currentLanguage, userRegion, onTabChange }: 
 
           <div><h4 className="font-medium text-sm mb-2 flex items-center gap-2"><Users className="h-4 w-4" />{t.nearbyFarmers}</h4>{nearbyUsers.map(user => (<div key={user.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg mb-2"><div className="flex items-center gap-3"><div className="relative"><div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-bold">{user.avatar}{user.online && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />}</div></div><div><p className="font-medium text-sm">{user.name}</p><p className="text-xs text-gray-500">{user.specialty} • {user.distance}km</p><div className="flex items-center gap-0.5"><Star className="h-3 w-3 text-yellow-500 fill-current" /><span className="text-xs">{user.rating}</span><span className="text-xs text-gray-400 ml-1">• {user.products} produits</span></div></div></div><Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => onTabChange("messages")}><MessageSquare className="h-3 w-3" />{t.contact}</Button></div>))}</div>
 
-          <div><h4 className="font-medium text-sm mb-2 flex items-center gap-2"><ShoppingCart className="h-4 w-4" />{t.availableProducts}</h4><div className="space-y-2">{displayedProducts.map(product => (<div key={product.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"><div className="flex items-center gap-3"><span className="text-2xl">{product.image}</span><div><p className="font-medium text-sm">{product.name}</p><p className="text-xs text-gray-500">{product.seller} • {product.distance}km</p><div className="flex items-center gap-1"><Star className="h-3 w-3 text-yellow-500" /><span className="text-xs">4.8</span><Badge className="ml-1 text-[10px]" variant={product.available ? "default" : "secondary"}>{product.available ? `${product.inStock} en stock` : t.outOfStock}</Badge></div></div></div><div className="text-right"><p className="font-bold text-purple-600">{formatNumber(product.price)} FCFA/{product.unit}</p><Button size="sm" className="mt-1 text-xs h-7" disabled={!product.available}>Acheter</Button></div></div>))}</div>{localProducts.length > 3 && <Button variant="outline" size="sm" className="w-full" onClick={() => setShowAllProducts(!showAllProducts)}>{showAllProducts ? "Voir moins" : `+${localProducts.length - 3} produits`}</Button>}</div>
+          {/* ✅ SECTION PRODUITS CORRIGÉE AVEC PRIX EN Pi */}
+          <div>
+            <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4" />
+              {t.availableProducts}
+            </h4>
+            <div className="space-y-2">
+              {displayedProducts.map(product => (
+                <div key={product.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{product.image}</span>
+                    <div>
+                      <p className="font-medium text-sm">{product.name}</p>
+                      <p className="text-xs text-gray-500">{product.seller} • {product.distance}km</p>
+                      <div className="flex items-center gap-1">
+                        <Star className="h-3 w-3 text-yellow-500" />
+                        <span className="text-xs">4.8</span>
+                        <Badge className="ml-1 text-[10px]" variant={product.available ? "default" : "secondary"}>
+                          {product.available ? `${product.inStock} en stock` : t.outOfStock}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-purple-600">{product.price} π / {product.unit}</p>
+                    <Button size="sm" className="mt-1 text-xs h-7" disabled={!product.available}>
+                      Acheter
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {localProducts.length > 3 && (
+              <Button variant="outline" size="sm" className="w-full mt-3" onClick={() => setShowAllProducts(!showAllProducts)}>
+                {showAllProducts ? "Voir moins" : `+${localProducts.length - 3} produits`}
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 
