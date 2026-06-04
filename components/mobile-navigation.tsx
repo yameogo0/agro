@@ -1,536 +1,984 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Progress } from "@/components/ui/progress"
 import {
-  Home,
-  MessageSquare,
-  Store,
-  BarChart3,
-  Menu,
-  Users,
-  Wallet,
-  Bell,
-  User,
-  Settings,
-  X,
-  ChevronUp,
-  Sparkles,
-  Clock,
-  MapPin,
+  Plus,
+  Search,
+  Filter,
   Star,
+  MapPin,
+  Clock,
+  Users,
+  TrendingUp,
+  Calendar,
+  CheckCircle,
+  Edit,
+  Trash2,
+  Eye,
+  MessageSquare,
+  Heart,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  DollarSign,
+  Wallet,
+  Pi,
+  RefreshCw,
+  AlertTriangle,
+  Shield,
+  Award,
+  Briefcase,
+  GraduationCap,
+  Stethoscope,
+  Truck,
+  Landmark,
+  Megaphone,
+  Utensils,
   Wifi,
   WifiOff,
-  ChevronDown,
-  Heart,
-  Calendar,
-  HelpCircle,
-  LogOut,
-  Shield,
-  Leaf,
-  TrendingUp,
-  ShoppingCart,
-  Globe,
-  BookOpen,
-  Map,
-  CreditCard,
-  Sun,
-  Moon,
-  ChevronRight,
-  Circle,
+  Loader2,
+  Phone,
+  Mail,
+  ExternalLink,
+  Tag,
+  Building,
+  User,
+  Clock as ClockIcon,
 } from "lucide-react"
-import { useOnlineStatus } from "@/hooks/use-online-status"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useDebounce } from "@/hooks/use-debounce"
+import { useOnlineStatus } from "@/hooks/use-online-status"
 import { usePiAuth } from "@/contexts/pi-auth-context"
-import { showToast } from "@/lib/utils"
+import { showToast, formatNumber, formatRelativeTime } from "@/lib/utils"
 
-interface MobileNavigationProps {
-  activeTab: string
-  onTabChange: (tab: string) => void
-  onMenuToggle: () => void
-  unreadCount?: number
-  notificationCount?: number
-  currentLanguage?: string
+interface ServiceManagementProps {
+  currentLanguage: string
+  userRegion: string
+}
+
+interface Service {
+  id: string
+  title: string
+  description: string
+  category: string
+  price: number
+  duration: string
+  provider: string
+  providerAvatar: string
+  location: string
+  rating: number
+  reviews: number
+  available: boolean
+  image?: string
+  phone?: string
+  experience?: number
+  createdAt: string
+}
+
+interface MyService {
+  id: string
+  title: string
+  description: string
+  category: string
+  price: number
+  status: "active" | "busy" | "paused"
+  bookings: number
+  earnings: number
+  rating: number
+  createdAt: string
 }
 
 // Traductions
 const translations: Record<string, any> = {
   fr: {
-    home: "Accueil",
-    messages: "Messages",
-    marketplace: "Marché",
-    data: "Données",
-    menu: "Menu",
-    network: "Réseau",
-    wallet: "Portefeuille",
-    alerts: "Alertes",
-    profile: "Profil",
-    settings: "Paramètres",
+    title: "Services & Marketplace",
+    subtitle: "Offres et prestations agricoles",
+    createService: "Créer un service",
+    editService: "Modifier le service",
+    myServices: "Mes services",
+    browse: "Explorer",
+    stats: "Statistiques",
+    allCategories: "Toutes catégories",
+    veterinary: "Vétérinaire",
+    training: "Formation",
+    consulting: "Conseil",
+    equipment: "Matériel",
+    feed: "Alimentation",
+    processing: "Transformation",
+    marketing: "Marketing",
+    finance: "Finance",
+    serviceTitle: "Titre du service",
+    description: "Description",
+    category: "Catégorie",
+    price: "Prix",
+    duration: "Durée",
+    location: "Localisation",
+    requirements: "Prérequis",
+    availability: "Disponibilité",
+    available: "Disponible",
+    busy: "Occupé",
+    paused: "En pause",
+    active: "Actif",
+    searchPlaceholder: "Rechercher un service...",
+    filter: "Filtrer",
+    book: "Réserver",
+    contact: "Contacter",
+    viewDetails: "Voir détails",
+    totalRevenue: "Chiffre d'affaires",
+    totalBookings: "Réservations",
+    avgRating: "Note moyenne",
+    activeServices: "Services actifs",
     online: "En ligne",
     offline: "Hors ligne",
-    quickAccess: "Accès rapide",
-    backToTop: "Haut",
-    farming: "Agriculture",
-    piReady: "Pi prêt",
-    promotions: "Promos",
-    help: "Aide",
-    logout: "Déconnexion",
-    premium: "Premium",
-    events: "Événements",
-    community: "Communauté",
-    tools: "Outils",
+    refresh: "Actualiser",
+    loading: "Chargement...",
+    noServices: "Aucun service disponible",
+    noMyServices: "Vous n'avez pas encore créé de service",
+    pricePlaceholder: "0.008",
+    exTitle: "Ex: Consultation avicole",
+    exDescription: "Description détaillée de votre service...",
+    exDuration: "Ex: 2 heures",
+    exLocation: "Ex: Ouagadougou",
+    selectCategory: "Sélectionner une catégorie",
+    serviceCreated: "Service créé avec succès",
+    serviceDeleted: "Service supprimé",
+    serviceUpdated: "Service mis à jour",
+    bookingSuccess: "Réservation confirmée",
+    bookingError: "Erreur lors de la réservation",
+    insufficientBalance: "Solde insuffisant",
+    confirmDelete: "Confirmer la suppression",
+    deleteConfirmMessage: "Cette action est irréversible",
+    cancel: "Annuler",
+    delete: "Supprimer",
+    provider: "Prestataire",
+    reviews: "avis",
+    experience: "ans d'expérience",
+    call: "Appeler",
   },
   en: {
-    home: "Home",
-    messages: "Messages",
-    marketplace: "Market",
-    data: "Data",
-    menu: "Menu",
-    network: "Network",
-    wallet: "Wallet",
-    alerts: "Alerts",
-    profile: "Profile",
-    settings: "Settings",
+    title: "Services & Marketplace",
+    subtitle: "Agricultural offers and services",
+    createService: "Create service",
+    editService: "Edit service",
+    myServices: "My services",
+    browse: "Browse",
+    stats: "Stats",
+    allCategories: "All categories",
+    veterinary: "Veterinary",
+    training: "Training",
+    consulting: "Consulting",
+    equipment: "Equipment",
+    feed: "Feed",
+    processing: "Processing",
+    marketing: "Marketing",
+    finance: "Finance",
+    serviceTitle: "Service title",
+    description: "Description",
+    category: "Category",
+    price: "Price",
+    duration: "Duration",
+    location: "Location",
+    requirements: "Requirements",
+    availability: "Availability",
+    available: "Available",
+    busy: "Busy",
+    paused: "Paused",
+    active: "Active",
+    searchPlaceholder: "Search service...",
+    filter: "Filter",
+    book: "Book",
+    contact: "Contact",
+    viewDetails: "View details",
+    totalRevenue: "Revenue",
+    totalBookings: "Bookings",
+    avgRating: "Avg rating",
+    activeServices: "Active services",
     online: "Online",
     offline: "Offline",
-    quickAccess: "Quick access",
-    backToTop: "Top",
-    farming: "Farming",
-    piReady: "Pi ready",
-    promotions: "Promos",
-    help: "Help",
-    logout: "Logout",
-    premium: "Premium",
-    events: "Events",
-    community: "Community",
-    tools: "Tools",
+    refresh: "Refresh",
+    loading: "Loading...",
+    noServices: "No services available",
+    noMyServices: "You haven't created any services yet",
+    pricePlaceholder: "0.008",
+    exTitle: "Ex: Poultry consultation",
+    exDescription: "Detailed description of your service...",
+    exDuration: "Ex: 2 hours",
+    exLocation: "Ex: Ouagadougou",
+    selectCategory: "Select category",
+    serviceCreated: "Service created successfully",
+    serviceDeleted: "Service deleted",
+    serviceUpdated: "Service updated",
+    bookingSuccess: "Booking confirmed",
+    bookingError: "Booking error",
+    insufficientBalance: "Insufficient balance",
+    confirmDelete: "Confirm deletion",
+    deleteConfirmMessage: "This action is irreversible",
+    cancel: "Cancel",
+    delete: "Delete",
+    provider: "Provider",
+    reviews: "reviews",
+    experience: "years experience",
+    call: "Call",
   },
 }
 
-export default function MobileNavigation({
-  activeTab,
-  onTabChange,
-  onMenuToggle,
-  unreadCount: externalUnreadCount = 0,
-  notificationCount: externalNotificationCount = 0,
-  currentLanguage = "fr",
-}: MobileNavigationProps) {
-  const [showExtendedMenu, setShowExtendedMenu] = useState(false)
-  const [isVisible, setIsVisible] = useState(true)
-  const [lastScrollY, setLastScrollY] = useState(0)
-  const [activeItem, setActiveItem] = useState(activeTab)
-  const [localUnreadCount, setLocalUnreadCount] = useState(externalUnreadCount)
-  const [showUserMenu, setShowUserMenu] = useState(false)
-  const [currentTime, setCurrentTime] = useState(new Date())
+// Catégories avec icônes
+const categories = [
+  { id: "all", name: "Toutes", icon: "📋", color: "bg-gray-500" },
+  { id: "veterinary", name: "Vétérinaire", icon: "🏥", color: "bg-blue-500" },
+  { id: "training", name: "Formation", icon: "🎓", color: "bg-green-500" },
+  { id: "consulting", name: "Conseil", icon: "💡", color: "bg-purple-500" },
+  { id: "equipment", name: "Matériel", icon: "🔧", color: "bg-orange-500" },
+  { id: "feed", name: "Alimentation", icon: "🌾", color: "bg-yellow-500" },
+  { id: "processing", name: "Transformation", icon: "🏭", color: "bg-indigo-500" },
+  { id: "marketing", name: "Marketing", icon: "📢", color: "bg-pink-500" },
+  { id: "finance", name: "Finance", icon: "💰", color: "bg-emerald-500" },
+]
 
-  const menuRef = useRef<HTMLDivElement>(null)
-  const extendedMenuRef = useRef<HTMLDivElement>(null)
+// Données de démonstration
+const demoAvailableServices: Service[] = [
+  {
+    id: "1",
+    title: "Consultation vétérinaire avicole",
+    description: "Consultation complète pour votre élevage de volailles. Diagnostic, conseils et plan de vaccination personnalisé.",
+    category: "veterinary",
+    price: 0.008,
+    duration: "2 heures",
+    provider: "Dr. Aminata Traoré",
+    providerAvatar: "AT",
+    location: "Ouagadougou",
+    rating: 4.9,
+    reviews: 23,
+    available: true,
+    phone: "+226 70 12 34 56",
+    experience: 12,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "2",
+    title: "Formation aviculture moderne",
+    description: "Formation intensive de 3 jours sur les techniques d'élevage moderne et la gestion sanitaire.",
+    category: "training",
+    price: 0.015,
+    duration: "3 jours",
+    provider: "Coopérative YELEN",
+    providerAvatar: "CY",
+    location: "Bobo-Dioulasso",
+    rating: 4.7,
+    reviews: 15,
+    available: true,
+    phone: "+226 70 23 45 67",
+    experience: 8,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "3",
+    title: "Location tracteur agricole",
+    description: "Location de tracteur avec chauffeur pour labour, semis et transport.",
+    category: "equipment",
+    price: 25,
+    duration: "Journée",
+    provider: "Coopérative Mécanisation",
+    providerAvatar: "CM",
+    location: "Koudougou",
+    rating: 4.6,
+    reviews: 8,
+    available: false,
+    phone: "+226 70 34 56 78",
+    experience: 10,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "4",
+    title: "Conseil en agriculture durable",
+    description: "Accompagnement personnalisé pour l'adoption de pratiques agricoles durables.",
+    category: "consulting",
+    price: 0.012,
+    duration: "1 heure",
+    provider: "Ibrahim Sawadogo",
+    providerAvatar: "IS",
+    location: "Ouahigouya",
+    rating: 4.8,
+    reviews: 12,
+    available: true,
+    phone: "+226 70 45 67 89",
+    experience: 15,
+    createdAt: new Date().toISOString(),
+  },
+]
+
+const demoMyServices: MyService[] = [
+  {
+    id: "m1",
+    title: "Conseil en aviculture",
+    description: "Accompagnement personnalisé pour votre élevage de volailles.",
+    category: "consulting",
+    price: 0.01,
+    status: "active",
+    bookings: 12,
+    earnings: 0.12,
+    rating: 4.8,
+    createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
+  },
+  {
+    id: "m2",
+    title: "Formation pondeuses",
+    description: "Formation sur l'optimisation de la production d'œufs.",
+    category: "training",
+    price: 0.02,
+    status: "active",
+    bookings: 8,
+    earnings: 0.16,
+    rating: 4.9,
+    createdAt: new Date(Date.now() - 86400000 * 45).toISOString(),
+  },
+]
+
+export default function ServiceManagement({ currentLanguage, userRegion }: ServiceManagementProps) {
+  const [activeTab, setActiveTab] = useState("browse")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState("all")
+  const [showCreateService, setShowCreateService] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
+  const [editingService, setEditingService] = useState<MyService | null>(null)
+  const [language, setLanguage] = useState(currentLanguage)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   const isOnline = useOnlineStatus()
-  const { userData, logout } = usePiAuth()
-  const [savedUnreadCount] = useLocalStorage<number>("unreadMessagesCount", 0)
-  const [savedNotificationCount] = useLocalStorage<number>("unreadNotificationsCount", 0)
+  const { userData, isAuthenticated } = usePiAuth()
+  const debouncedSearch = useDebounce(searchQuery, 300)
 
-  const t = translations[currentLanguage as keyof typeof translations] || translations.fr
+  const [services, setServices] = useState<Service[]>(demoAvailableServices)
+  const [myServices, setMyServices] = useState<MyService[]>(demoMyServices)
+  const [isLoadingServices, setIsLoadingServices] = useState(false)
 
-  // Heure actuelle
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000)
-    return () => clearTimeout(timer)
-  }, [])
+  const t = translations[language as keyof typeof translations] || translations.fr
 
-  // Navigation principale (5 éléments)
-  const mainNavigationItems = [
-    { id: "home", label: t.home, icon: Home, color: "text-green-600", activeColor: "bg-green-600", tab: "home" },
-    { id: "messages", label: t.messages, icon: MessageSquare, color: "text-blue-600", activeColor: "bg-blue-600", badge: localUnreadCount || savedUnreadCount, tab: "messages" },
-    { id: "marketplace", label: t.marketplace, icon: Store, color: "text-purple-600", activeColor: "bg-purple-600", tab: "services" },
-    { id: "data", label: t.data, icon: BarChart3, color: "text-orange-600", activeColor: "bg-orange-600", tab: "analytics" },
-    { id: "menu", label: t.menu, icon: Menu, color: "text-gray-600", activeColor: "bg-gray-600", action: "menu" },
-  ]
+  const [newService, setNewService] = useState({
+    title: "",
+    description: "",
+    category: "",
+    price: "",
+    duration: "",
+    location: "",
+    availability: "available",
+  })
 
-  // Menu étendu (options supplémentaires)
-  const extendedMenuItems = [
-    { id: "network", label: t.network, icon: Users, color: "text-cyan-600", bgColor: "bg-cyan-50", tab: "messages" },
-    { id: "wallet", label: t.wallet, icon: Wallet, color: "text-purple-600", bgColor: "bg-purple-50", badge: "π", tab: "wallet" },
-    { id: "alerts", label: t.alerts, icon: Bell, color: "text-red-600", bgColor: "bg-red-50", badge: savedNotificationCount || externalNotificationCount, tab: "alerts" },
-    { id: "profile", label: t.profile, icon: User, color: "text-emerald-600", bgColor: "bg-emerald-50", tab: "profile" },
-    { id: "settings", label: t.settings, icon: Settings, color: "text-gray-600", bgColor: "bg-gray-50", tab: "settings" },
-    { id: "community", label: t.community, icon: Users, color: "text-indigo-600", bgColor: "bg-indigo-50", tab: "regional" },
-    { id: "tools", label: t.tools, icon: Leaf, color: "text-green-600", bgColor: "bg-green-50", tab: "aviculture" },
-    { id: "events", label: t.events, icon: Calendar, color: "text-pink-600", bgColor: "bg-pink-50", tab: "events" },
-  ]
+  // Filtrer les services
+  const filteredServices = services.filter(service => {
+    const matchesSearch = service.title.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      service.description.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      service.provider.toLowerCase().includes(debouncedSearch.toLowerCase())
+    const matchesCategory = selectedCategory === "all" || service.category === selectedCategory
+    return matchesSearch && matchesCategory
+  })
 
-  const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  // Statistiques
+  const totalRevenue = myServices.reduce((sum, s) => sum + (s.earnings || 0), 0)
+  const totalBookings = myServices.reduce((sum, s) => sum + (s.bookings || 0), 0)
+  const avgRating = myServices.length > 0
+    ? myServices.reduce((sum, s) => sum + (s.rating || 0), 0) / myServices.length
+    : 0
+  const activeServicesCount = myServices.filter(s => s.status === "active").length
 
-  // Mettre à jour le compteur
-  useEffect(() => {
-    setLocalUnreadCount(externalUnreadCount || savedUnreadCount)
-  }, [externalUnreadCount, savedUnreadCount])
+  // Créer un service
+  const handleCreateService = async () => {
+    if (!newService.title || !newService.category || !newService.price) {
+      showToast("Veuillez remplir tous les champs obligatoires", "error")
+      return
+    }
 
-  // Gestion de la visibilité au scroll
-  useEffect(() => {
-    let ticking = false
-    let scrollTimeout: NodeJS.Timeout
+    if (!isOnline) {
+      showToast("Connexion internet requise", "error")
+      return
+    }
 
-    const handleScroll = () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          const currentScrollY = window.scrollY
-          if (currentScrollY > lastScrollY && currentScrollY > 100) {
-            setIsVisible(false)
-          } else if (currentScrollY < lastScrollY) {
-            setIsVisible(true)
-          }
-          setLastScrollY(currentScrollY)
-          ticking = false
-        })
-        ticking = true
+    setIsLoading(true)
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      const newServiceData: MyService = {
+        id: `m${Date.now()}`,
+        title: newService.title,
+        description: newService.description,
+        category: newService.category,
+        price: parseFloat(newService.price),
+        status: "active",
+        bookings: 0,
+        earnings: 0,
+        rating: 0,
+        createdAt: new Date().toISOString(),
       }
 
-      clearTimeout(scrollTimeout)
-      scrollTimeout = setTimeout(() => setIsVisible(true), 1000)
+      setMyServices([newServiceData, ...myServices])
+      setShowCreateService(false)
+      setNewService({
+        title: "",
+        description: "",
+        category: "",
+        price: "",
+        duration: "",
+        location: "",
+        availability: "available",
+      })
+      showToast(t.serviceCreated, "success")
+    } catch {
+      showToast("Erreur lors de la création", "error")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Supprimer un service
+  const handleDeleteService = async (id: string) => {
+    setIsLoading(true)
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500))
+      setMyServices(myServices.filter(s => s.id !== id))
+      setShowDeleteConfirm(null)
+      showToast(t.serviceDeleted, "success")
+    } catch {
+      showToast("Erreur lors de la suppression", "error")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Réserver un service (paiement Pi)
+  const handleBookService = async (service: Service) => {
+    if (!isOnline) {
+      showToast("Connexion internet requise", "error")
+      return
     }
 
-    window.addEventListener("scroll", handleScroll, { passive: true })
-    return () => {
-      window.removeEventListener("scroll", handleScroll)
-      clearTimeout(scrollTimeout)
+    if (!isAuthenticated) {
+      showToast("Veuillez vous connecter avec Pi Network", "error")
+      return
     }
-  }, [lastScrollY])
 
-  // Mettre à jour l'élément actif
+    setIsLoading(true)
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      showToast(`Réservation confirmée pour ${service.price} π`, "success")
+    } catch {
+      showToast("Erreur lors de la réservation", "error")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Rafraîchir les données
+  const refreshData = useCallback(async () => {
+    if (!isOnline) {
+      showToast("Connexion internet requise", "error")
+      return
+    }
+
+    setIsSyncing(true)
+    try {
+      await new Promise(resolve => setTimeout(resolve, 800))
+      showToast("Données actualisées", "success")
+    } catch {
+      showToast("Erreur lors de l'actualisation", "error")
+    } finally {
+      setIsSyncing(false)
+    }
+  }, [isOnline])
+
   useEffect(() => {
-    setActiveItem(activeTab)
-  }, [activeTab])
+    setLanguage(currentLanguage)
+  }, [currentLanguage])
 
-  // Fermer les menus au clic extérieur
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      if (showExtendedMenu && extendedMenuRef.current && !extendedMenuRef.current.contains(target)) {
-        setShowExtendedMenu(false)
-      }
-      if (showUserMenu && menuRef.current && !menuRef.current.contains(target)) {
-        setShowUserMenu(false)
-      }
-    }
-    document.addEventListener("click", handleClickOutside)
-    return () => document.removeEventListener("click", handleClickOutside)
-  }, [showExtendedMenu, showUserMenu])
+  const getCategoryInfo = (categoryId: string) => {
+    return categories.find(c => c.id === categoryId) || categories[0]
+  }
 
-  const handleTabChange = (id: string, action?: string, tab?: string) => {
-    if (action === "menu") {
-      setShowExtendedMenu(!showExtendedMenu)
-    } else {
-      let targetTab = tab || id
-      if (id === "marketplace") targetTab = "services"
-      else if (id === "data") targetTab = "analytics"
-      else if (id === "network") targetTab = "messages"
-      else if (id === "community") targetTab = "regional"
-      else if (id === "tools") targetTab = "aviculture"
-      else if (id === "events") targetTab = "events"
-
-      onTabChange(targetTab)
-      setActiveItem(id)
-      if (showExtendedMenu) setShowExtendedMenu(false)
-      if (showUserMenu) setShowUserMenu(false)
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active": return "bg-green-100 text-green-700"
+      case "busy": return "bg-yellow-100 text-yellow-700"
+      case "paused": return "bg-gray-100 text-gray-700"
+      default: return "bg-gray-100 text-gray-700"
     }
   }
 
-  const handleExtendedMenuClick = (item: typeof extendedMenuItems[0]) => {
-    let targetTab = item.tab
-    if (item.id === "network") targetTab = "messages"
-    if (item.id === "community") targetTab = "regional"
-    if (item.id === "tools") targetTab = "aviculture"
-
-    onTabChange(targetTab)
-    setActiveItem(item.id)
-    setShowExtendedMenu(false)
-    onMenuToggle()
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "active": return t.available
+      case "busy": return t.busy
+      case "paused": return t.paused
+      default: return status
+    }
   }
-
-  const handleLogout = async () => {
-    await logout()
-    showToast("Déconnexion réussie", "success")
-    setShowUserMenu(false)
-  }
-
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" })
-  }
-
-  const userName = userData?.username?.split(" ")[0] || "Agriculteur"
-  const userAvatar = userData?.avatar || userData?.username?.charAt(0).toUpperCase() || "🌾"
 
   return (
-    <>
-      {/* Menu utilisateur flottant */}
-      {showUserMenu && (
-        <div
-          ref={menuRef}
-          className="fixed top-16 right-4 w-64 bg-white rounded-2xl shadow-2xl border z-50 animate-in slide-in-from-top-5 duration-200"
-        >
-          <div className="p-4 border-b bg-gradient-to-r from-green-50 to-blue-50 rounded-t-2xl">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-md">
-                {userAvatar}
-              </div>
-              <div>
-                <p className="font-semibold text-gray-800">{userName}</p>
-                <p className="text-xs text-gray-500">Membre Agro MC</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <Badge className="bg-green-100 text-green-700 text-[10px]">
-                    {isOnline ? t.online : t.offline}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="p-2">
-            <button
-              className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-gray-50 transition-colors"
-              onClick={() => handleTabChange("profile", undefined, "profile")}
-            >
-              <User className="h-4 w-4 text-gray-500" />
-              <span className="text-sm">{t.profile}</span>
-            </button>
-            <button
-              className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-gray-50 transition-colors"
-              onClick={() => handleTabChange("wallet", undefined, "wallet")}
-            >
-              <Wallet className="h-4 w-4 text-purple-500" />
-              <span className="text-sm">{t.wallet}</span>
-            </button>
-            <button
-              className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-gray-50 transition-colors"
-              onClick={() => handleTabChange("settings", undefined, "settings")}
-            >
-              <Settings className="h-4 w-4 text-gray-500" />
-              <span className="text-sm">{t.settings}</span>
-            </button>
-            <div className="border-t my-2" />
-            <button
-              className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-red-50 transition-colors text-red-600"
-              onClick={handleLogout}
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="text-sm">{t.logout}</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Menu étendu flottant */}
-      {showExtendedMenu && (
-        <div
-          ref={extendedMenuRef}
-          className="fixed bottom-20 left-4 right-4 bg-white rounded-2xl shadow-2xl border z-50 animate-in slide-in-from-bottom-5 duration-200"
-        >
-          <div className="p-4 border-b flex items-center justify-between bg-gradient-to-r from-green-50 to-blue-50 rounded-t-2xl">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-white" />
-              </div>
-              <h3 className="font-semibold text-gray-800">{t.quickAccess}</h3>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400">{formatTime(currentTime)}</span>
-              <button onClick={() => setShowExtendedMenu(false)} className="p-1 rounded-full hover:bg-gray-100">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-          <div className="p-3 grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto">
-            {extendedMenuItems.map((item) => {
-              const Icon = item.icon
-              const isActive = activeItem === item.id
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleExtendedMenuClick(item)}
-                  className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-                    isActive ? item.bgColor + " ring-2 ring-offset-1 ring-green-500" : "hover:bg-gray-50"
-                  }`}
-                >
-                  <div className={`w-10 h-10 ${item.bgColor} rounded-full flex items-center justify-center`}>
-                    <Icon className={`h-5 w-5 ${item.color}`} />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="font-medium text-sm">{item.label}</p>
-                    {item.badge && (
-                      <div className="flex items-center gap-1 mt-0.5">
-                        {typeof item.badge === "number" && item.badge > 0 ? (
-                          <span className="text-xs text-red-500 font-medium">{item.badge} non lus</span>
-                        ) : item.badge === "π" ? (
-                          <span className="text-xs text-purple-500 font-medium flex items-center gap-0.5">
-                            <Wallet className="h-2.5 w-2.5" />
-                            Pi actif
-                          </span>
-                        ) : null}
-                      </div>
-                    )}
-                  </div>
-                  {isActive && <div className="w-2 h-2 bg-green-500 rounded-full" />}
-                </button>
-              )
-            })}
-          </div>
-          <div className="p-3 border-t bg-gray-50 rounded-b-2xl">
-            <div className="flex items-center justify-between text-xs text-gray-500">
-              <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                <span>{t.quickAccess}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                <span>Basé sur votre position</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Barre de navigation principale */}
-      <div
-        className={`lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t shadow-lg transition-transform duration-300 z-40 ${
-          isVisible ? "translate-y-0" : "translate-y-full"
-        }`}
-      >
-        {/* Indicateur de swipe */}
-        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2">
-          <div className="w-12 h-1 bg-gray-300 rounded-full" />
-        </div>
-
-        {/* Statut réseau et utilisateur */}
-        <div className="flex items-center justify-between px-3 pt-1 pb-0">
-          <div className="flex items-center gap-2">
-            {isOnline ? (
-              <div className="flex items-center gap-1 text-green-600">
-                <Wifi className="h-3 w-3" />
-                <span className="text-[10px]">{t.online}</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 text-yellow-600">
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Briefcase className="h-6 w-6 text-green-600" />
+            <h2 className="text-xl md:text-2xl font-bold">{t.title}</h2>
+            {!isOnline && (
+              <Badge className="bg-yellow-500 text-white text-xs gap-1">
                 <WifiOff className="h-3 w-3" />
-                <span className="text-[10px]">{t.offline}</span>
-              </div>
+                {t.offline}
+              </Badge>
             )}
-            <div className="w-px h-3 bg-gray-300" />
-            <div className="flex items-center gap-1 text-gray-500">
-              <Leaf className="h-3 w-3" />
-              <span className="text-[10px]">{t.farming}</span>
-            </div>
           </div>
-          <button
-            className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-green-600 transition-colors"
-            onClick={() => setShowUserMenu(!showUserMenu)}
-          >
-            <div className="w-5 h-5 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
-              {userAvatar}
-            </div>
-            <span>{userName}</span>
-            <ChevronDown className="h-3 w-3" />
-          </button>
+          <p className="text-gray-500 text-sm mt-1">{t.subtitle} - {userRegion}</p>
         </div>
-
-        {/* Navigation principale */}
-        <div className="grid grid-cols-5 gap-0 p-2 pb-3">
-          {mainNavigationItems.map((item) => {
-            const Icon = item.icon
-            const isActive = activeItem === item.id ||
-              (item.id === "marketplace" && activeTab === "services") ||
-              (item.id === "data" && activeTab === "analytics")
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleTabChange(item.id, item.action, item.tab)}
-                className={`relative flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-all duration-200 ${
-                  isActive ? "scale-105" : "hover:scale-102"
-                }`}
-              >
-                {/* Badge de notification */}
-                {item.badge && item.badge > 0 && !isActive && (
-                  <div className="absolute -top-1 right-3 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center animate-pulse z-10 shadow-sm">
-                    <span className="text-[10px] font-bold text-white">{item.badge > 9 ? "9+" : item.badge}</span>
-                  </div>
-                )}
-
-                {/* Animation de pulsation pour l'élément actif */}
-                {isActive && <div className="absolute inset-0 bg-green-50 rounded-xl animate-pulse-slow" />}
-
-                <div className={`relative z-10 transition-all duration-200 ${isActive ? "transform -translate-y-0.5" : ""}`}>
-                  <Icon className={`h-5 w-5 transition-all ${isActive ? item.color + " drop-shadow-md" : "text-gray-500"}`} />
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={refreshData} disabled={isSyncing} className="gap-1">
+            <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+            {t.refresh}
+          </Button>
+          <Dialog open={showCreateService} onOpenChange={setShowCreateService}>
+            <DialogTrigger asChild>
+              <Button className="bg-green-600 hover:bg-green-700 gap-1 text-sm">
+                <Plus className="h-4 w-4" />
+                {t.createService}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-xl">
+                  <Plus className="h-5 w-5 text-green-600" />
+                  {editingService ? t.editService : t.createService}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>{t.serviceTitle} *</Label>
+                  <Input
+                    value={newService.title}
+                    onChange={(e) => setNewService({ ...newService, title: e.target.value })}
+                    placeholder={t.exTitle}
+                  />
                 </div>
-
-                <span className={`text-[10px] mt-1 transition-all font-medium ${isActive ? item.color : "text-gray-500"}`}>
-                  {item.label}
-                </span>
-
-                {/* Indicateur actif */}
-                {isActive && <div className={`absolute -bottom-2 w-6 h-1 ${item.activeColor} rounded-full transition-all duration-200`} />}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Barre d'information supplémentaire */}
-        <div className="flex items-center justify-between px-4 py-1.5 border-t bg-gray-50/50">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-0.5">
-              <Star className="h-3 w-3 text-yellow-500 fill-current" />
-              <span className="text-[10px] text-gray-600">4.8</span>
-            </div>
-            <div className="w-px h-3 bg-gray-300" />
-            <div className="flex items-center gap-0.5">
-              <Heart className="h-3 w-3 text-red-500" />
-              <span className="text-[10px] text-gray-600">1.2k</span>
-            </div>
-            <div className="w-px h-3 bg-gray-300" />
-            <div className="flex items-center gap-0.5">
-              <CreditCard className="h-3 w-3 text-purple-600" />
-              <span className="text-[10px] text-gray-600">{t.piReady}</span>
-            </div>
-          </div>
-          <button
-            onClick={scrollToTop}
-            className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-green-600 transition-colors"
-          >
-            <ChevronUp className="h-3 w-3" />
-            {t.backToTop}
-          </button>
+                <div>
+                  <Label>{t.description} *</Label>
+                  <Textarea
+                    value={newService.description}
+                    onChange={(e) => setNewService({ ...newService, description: e.target.value })}
+                    placeholder={t.exDescription}
+                    rows={3}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t.category} *</Label>
+                    <Select value={newService.category} onValueChange={(v) => setNewService({ ...newService, category: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t.selectCategory} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.filter(c => c.id !== "all").map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            <span className="flex items-center gap-2">
+                              <span>{cat.icon}</span>
+                              <span>{cat.name}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>{t.price} (π) *</Label>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      value={newService.price}
+                      onChange={(e) => setNewService({ ...newService, price: e.target.value })}
+                      placeholder={t.pricePlaceholder}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t.duration}</Label>
+                    <Input
+                      value={newService.duration}
+                      onChange={(e) => setNewService({ ...newService, duration: e.target.value })}
+                      placeholder={t.exDuration}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t.location}</Label>
+                    <Input
+                      value={newService.location}
+                      onChange={(e) => setNewService({ ...newService, location: e.target.value })}
+                      placeholder={t.exLocation}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>{t.availability}</Label>
+                  <Select value={newService.availability} onValueChange={(v) => setNewService({ ...newService, availability: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="available">{t.available}</SelectItem>
+                      <SelectItem value="busy">{t.busy}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  onClick={handleCreateService}
+                  className="w-full bg-purple-600 hover:bg-purple-700 gap-2"
+                  disabled={isLoading}
+                >
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pi className="h-4 w-4" />}
+                  {editingService ? t.editService : t.createService}
+                </Button>
+                {!isOnline && <p className="text-xs text-red-500 text-center">⚠️ {t.offline}</p>}
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      {/* Overlay pour le menu étendu */}
-      {showExtendedMenu && (
-        <div className="lg:hidden fixed inset-0 bg-black/20 z-40 animate-fade-in" onClick={() => setShowExtendedMenu(false)} />
-      )}
+      {/* Onglets */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="browse" className="gap-2">
+            <Search className="h-4 w-4" />
+            {t.browse}
+          </TabsTrigger>
+          <TabsTrigger value="my-services" className="gap-2">
+            <Briefcase className="h-4 w-4" />
+            {t.myServices}
+          </TabsTrigger>
+          <TabsTrigger value="stats" className="gap-2">
+            <TrendingUp className="h-4 w-4" />
+            {t.stats}
+          </TabsTrigger>
+        </TabsList>
 
-      <style jsx>{`
-        @keyframes pulse-slow {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 0.6; }
-        }
-        @keyframes slide-in-bottom {
-          from { transform: translateY(100%); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes slide-in-top {
-          from { transform: translateY(-20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        .animate-pulse-slow { animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-        .animate-in { animation: slide-in-bottom 0.2s ease-out; }
-        .slide-in-from-top-5 { animation: slide-in-top 0.2s ease-out; }
-        .animate-fade-in { animation: fade-in 0.2s ease-out; }
-        .hover\:scale-102:hover { transform: scale(1.02); }
-      `}</style>
-    </>
+        {/* Onglet Explorer */}
+        <TabsContent value="browse" className="mt-6 space-y-4">
+          {/* Barre de recherche et filtres */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder={t.searchPlaceholder}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {categories.map((cat) => (
+                <Button
+                  key={cat.id}
+                  size="sm"
+                  variant={selectedCategory === cat.id ? "default" : "outline"}
+                  className={`gap-1 whitespace-nowrap ${selectedCategory === cat.id ? "bg-green-600" : ""}`}
+                  onClick={() => setSelectedCategory(cat.id)}
+                >
+                  <span>{cat.icon}</span>
+                  <span className="hidden sm:inline">{cat.name}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Liste des services */}
+          {isLoadingServices ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+            </div>
+          ) : filteredServices.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <Search className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p className="text-sm">{t.noServices}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredServices.map((service) => {
+                const category = getCategoryInfo(service.category)
+                return (
+                  <Card key={service.id} className="hover:shadow-md transition-all">
+                    <CardContent className="p-4">
+                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                        <div className="flex gap-3">
+                          <div className={`w-12 h-12 ${category.color} rounded-xl flex items-center justify-center text-white text-xl bg-opacity-20`}>
+                            <span>{category.icon}</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-semibold">{service.title}</h3>
+                              <Badge className={service.available ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}>
+                                {service.available ? t.available : t.busy}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1 line-clamp-2">{service.description}</p>
+                            <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 flex-wrap">
+                              <div className="flex items-center gap-1">
+                                <Star className="h-3 w-3 text-yellow-500 fill-current" />
+                                <span>{service.rating}</span>
+                                <span>({service.reviews} {t.reviews})</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                <span>{service.location}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <ClockIcon className="h-3 w-3" />
+                                <span>{service.duration}</span>
+                              </div>
+                              {service.experience && (
+                                <div className="flex items-center gap-1">
+                                  <Award className="h-3 w-3" />
+                                  <span>{service.experience} {t.experience}</span>
+                                </div>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                              <User className="h-2.5 w-2.5" />
+                              {service.provider}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="text-xl font-bold text-purple-600">{service.price} π</p>
+                            <p className="text-xs text-gray-500">Prix estimé</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            className="bg-purple-600 hover:bg-purple-700 gap-1"
+                            onClick={() => handleBookService(service)}
+                            disabled={!service.available || isLoading}
+                          >
+                            {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pi className="h-3 w-3" />}
+                            {t.book}
+                          </Button>
+                          {service.phone && (
+                            <Button size="sm" variant="outline" className="gap-1" asChild>
+                              <a href={`tel:${service.phone}`}>
+                                <Phone className="h-3 w-3" />
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Onglet Mes services */}
+        <TabsContent value="my-services" className="mt-6 space-y-4">
+          {myServices.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <Briefcase className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p className="text-sm">{t.noMyServices}</p>
+              <Button variant="outline" className="mt-4 gap-2" onClick={() => setShowCreateService(true)}>
+                <Plus className="h-4 w-4" />
+                {t.createService}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {myServices.map((service) => {
+                const category = getCategoryInfo(service.category)
+                return (
+                  <Card key={service.id} className="hover:shadow-md transition-all">
+                    <CardContent className="p-4">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex gap-3">
+                          <div className={`w-10 h-10 ${category.color} rounded-lg flex items-center justify-center text-white text-lg bg-opacity-20`}>
+                            <span>{category.icon}</span>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-semibold">{service.title}</h3>
+                              <Badge className={getStatusColor(service.status)}>
+                                {getStatusLabel(service.status)}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1 line-clamp-1">{service.description}</p>
+                            <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                              <div className="flex items-center gap-1">
+                                <Star className="h-3 w-3 text-yellow-500 fill-current" />
+                                <span>{service.rating || "Nouveau"}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                <span>{service.bookings} réservations</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                <span>{formatRelativeTime(service.createdAt)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-purple-600">{service.price} π</p>
+                            <p className="text-xs text-gray-500">Gagné: {service.earnings} π</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="gap-1"
+                            onClick={() => setShowDeleteConfirm(service.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            {t.delete}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Onglet Statistiques */}
+        <TabsContent value="stats" className="mt-6 space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4 text-center">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <TrendingUp className="h-5 w-5 text-green-600" />
+                </div>
+                <p className="text-2xl font-bold text-purple-600">{totalRevenue.toFixed(4)} π</p>
+                <p className="text-xs text-gray-500">{t.totalRevenue}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <Users className="h-5 w-5 text-blue-600" />
+                </div>
+                <p className="text-2xl font-bold">{totalBookings}</p>
+                <p className="text-xs text-gray-500">{t.totalBookings}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <Star className="h-5 w-5 text-yellow-500 fill-current" />
+                </div>
+                <p className="text-2xl font-bold">{avgRating.toFixed(1)}</p>
+                <p className="text-xs text-gray-500">{t.avgRating}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <Briefcase className="h-5 w-5 text-purple-600" />
+                </div>
+                <p className="text-2xl font-bold">{activeServicesCount}</p>
+                <p className="text-xs text-gray-500">{t.activeServices}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Progression mensuelle</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>Janvier</span>
+                    <span className="font-medium">2.5 π</span>
+                  </div>
+                  <Progress value={25} className="h-2" />
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>Février</span>
+                    <span className="font-medium">4.2 π</span>
+                  </div>
+                  <Progress value={42} className="h-2" />
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>Mars</span>
+                    <span className="font-medium">6.8 π</span>
+                  </div>
+                  <Progress value={68} className="h-2" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Répartition par catégorie</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {categories.filter(c => c.id !== "all").map((cat) => {
+                  const count = myServices.filter(s => s.category === cat.id).length
+                  if (count === 0) return null
+                  return (
+                    <div key={cat.id}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="flex items-center gap-2"><span>{cat.icon}</span> {cat.name}</span>
+                        <span className="font-medium">{count} service{count > 1 ? 's' : ''}</span>
+                      </div>
+                      <Progress value={Math.min((count / myServices.length) * 100, 100)} className="h-2" />
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Modal de confirmation de suppression */}
+      <Dialog open={!!showDeleteConfirm} onOpenChange={() => setShowDeleteConfirm(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              {t.confirmDelete}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-gray-600">{t.deleteConfirmMessage}</p>
+          <div className="flex gap-3 mt-4">
+            <Button variant="outline" className="flex-1" onClick={() => setShowDeleteConfirm(null)}>
+              {t.cancel}
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1 gap-2"
+              onClick={() => showDeleteConfirm && handleDeleteService(showDeleteConfirm)}
+              disabled={isLoading}
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {t.delete}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }
