@@ -13,7 +13,6 @@ import { Label } from "@/components/ui/label"
 import {
   Plus,
   Search,
-  Filter,
   Star,
   MapPin,
   Clock,
@@ -23,7 +22,6 @@ import {
   CheckCircle,
   Edit,
   Trash2,
-  Eye,
   MessageSquare,
   Heart,
   Loader2,
@@ -37,6 +35,7 @@ import { usePiAuth } from "@/contexts/pi-auth-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { showToast } from "@/lib/utils"
 import { createPiPayment, isPiSDKAvailable } from "@/lib/pi-payments"
+
 interface ServiceManagementProps {
   currentLanguage: string
   userRegion: string
@@ -79,17 +78,32 @@ interface MyService {
   createdAt: string
 }
 
+interface Booking {
+  id: string
+  serviceId: string
+  serviceTitle: string
+  providerName: string
+  clientName: string
+  amount: number
+  amountDisplay: string
+  date: string
+  time: string
+  status: "pending" | "confirmed" | "completed" | "cancelled"
+  paymentId?: string
+}
+
 export default function ServiceManagement({ currentLanguage, userRegion }: ServiceManagementProps) {
   const [activeTab, setActiveTab] = useState("browse")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [showCreateService, setShowCreateService] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isProcessing, setIsProcessing] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const isOnline = useOnlineStatus()
   const { isAuthenticated, userData } = usePiAuth()
   const [favoriteServices, setFavoriteServices] = useLocalStorage<string[]>("favoriteServices", [])
+  const [myBookings, setMyBookings] = useLocalStorage<Booking[]>("userBookings", [])
 
   const [newService, setNewService] = useState({
     title: "",
@@ -249,6 +263,7 @@ export default function ServiceManagement({ currentLanguage, userRegion }: Servi
   }, [isOnline])
 
   const handleBookService = async (service: Service) => {
+    // Vérifications
     if (!isOnline) {
       showToast("Connexion internet requise", "error")
       return
@@ -259,24 +274,48 @@ export default function ServiceManagement({ currentLanguage, userRegion }: Servi
       return
     }
 
-    // Vérifier que le SDK Pi est disponible
     if (!isPiSDKAvailable()) {
       showToast("Veuillez ouvrir cette application dans Pi Browser", "error")
       return
     }
 
-    setIsLoading(true)
+    if (service.availability !== "available") {
+      showToast("Ce service n'est pas disponible pour le moment", "error")
+      return
+    }
+
+    setIsProcessing(service.id)
+
     try {
+      // Créer le paiement Pi
       const payment = await createPiPayment(service.price, `Réservation: ${service.title}`)
+      
       if (payment.identifier) {
-        showToast(`Réservation confirmée pour ${service.priceDisplay}`, "success")
+        // Sauvegarder la réservation
+        const newBooking: Booking = {
+          id: payment.identifier,
+          serviceId: service.id,
+          serviceTitle: service.title,
+          providerName: service.provider.name,
+          clientName: userData?.username || "Client",
+          amount: service.price,
+          amountDisplay: service.priceDisplay,
+          date: new Date().toISOString().split('T')[0],
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          status: "confirmed",
+          paymentId: payment.identifier,
+        }
+        
+        setMyBookings([newBooking, ...myBookings])
+        showToast(`✅ Réservation confirmée ! ${service.priceDisplay} débité`, "success")
       } else {
         throw new Error('Paiement échoué')
       }
     } catch (error: any) {
+      console.error("Erreur paiement:", error)
       showToast(error.message || "Erreur lors du paiement", "error")
     } finally {
-      setIsLoading(false)
+      setIsProcessing(null)
     }
   }
 
@@ -285,7 +324,6 @@ export default function ServiceManagement({ currentLanguage, userRegion }: Servi
       showToast("Veuillez remplir tous les champs obligatoires", "error")
       return
     }
-    console.log("Nouveau service créé:", newService)
     setShowCreateService(false)
     setNewService({
       title: "",
@@ -402,7 +440,15 @@ export default function ServiceManagement({ currentLanguage, userRegion }: Servi
                     <div className="flex gap-2">
                       <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => handleToggleFavorite(service.id)}><Heart className={`h-4 w-4 ${favoriteServices.includes(service.id) ? "fill-red-500 text-red-500" : ""}`} /></Button>
                       <Button size="sm" variant="outline" className="h-8 gap-1 text-xs"><MessageSquare className="h-3 w-3" />Contacter</Button>
-                      <Button size="sm" className="bg-purple-600 hover:bg-purple-700 h-8 gap-1 text-xs" disabled={service.availability !== "available" || isLoading} onClick={() => handleBookService(service)}>{isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pi className="h-3 w-3" />}Réserver</Button>
+                      <Button 
+                        size="sm" 
+                        className="bg-purple-600 hover:bg-purple-700 h-8 gap-1 text-xs" 
+                        disabled={service.availability !== "available" || isProcessing === service.id} 
+                        onClick={() => handleBookService(service)}
+                      >
+                        {isProcessing === service.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pi className="h-3 w-3" />}
+                        Réserver
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -432,12 +478,36 @@ export default function ServiceManagement({ currentLanguage, userRegion }: Servi
 
         <TabsContent value="bookings" className="mt-6">
           <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5" />Réservations récentes</CardTitle></CardHeader>
-            <CardContent><div className="space-y-3">{[
-              { service: "Consultation vétérinaire", client: "Ibrahim Sawadogo", date: "2024-02-05", time: "14:00", status: "confirmed", amount: "0.008π" },
-              { service: "Formation aviculture", client: "Marie Ouédraogo", date: "2024-02-08", time: "09:00", status: "pending", amount: "0.025π" },
-              { service: "Conseil technique", client: "Paul Kaboré", date: "2024-02-10", time: "16:00", status: "completed", amount: "0.015π" },
-            ].map((booking, i) => (<div key={i} className="flex flex-col sm:flex-row justify-between p-3 border rounded-lg"><div className="flex items-center gap-3"><div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">{booking.client.charAt(0)}</div><div><p className="font-medium text-sm">{booking.service}</p><p className="text-xs text-gray-500">{booking.client} • {booking.date} à {booking.time}</p></div></div><div className="flex items-center justify-between sm:justify-end gap-3 mt-2 sm:mt-0"><p className="font-bold text-purple-600 text-sm">{booking.amount}</p><Badge className={booking.status === "completed" ? "bg-green-100 text-green-700" : booking.status === "confirmed" ? "bg-blue-100 text-blue-700" : "bg-yellow-100 text-yellow-700"}>{booking.status === "completed" ? "Terminé" : booking.status === "confirmed" ? "Confirmé" : "En attente"}</Badge></div></div>))}</div></CardContent>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5" />Mes réservations</CardTitle></CardHeader>
+            <CardContent>
+              {myBookings.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>Aucune réservation pour le moment</p>
+                  <p className="text-sm">Les réservations apparaîtront ici après paiement</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {myBookings.map((booking) => (
+                    <div key={booking.id} className="flex flex-col sm:flex-row justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">
+                          {booking.providerName.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{booking.serviceTitle}</p>
+                          <p className="text-xs text-gray-500">{booking.providerName} • {booking.date}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between sm:justify-end gap-3 mt-2 sm:mt-0">
+                        <p className="font-bold text-purple-600 text-sm">{booking.amountDisplay}</p>
+                        <Badge className="bg-green-100 text-green-700">Confirmé</Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
