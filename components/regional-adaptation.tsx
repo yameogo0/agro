@@ -69,17 +69,444 @@ interface RegionData {
   rainfall?: number
 }
 
-interface WeatherForecast {
-  day: string
-  temp: number
-  icon: string
+// --- Base de données complète des pays ---
+// Pour les pays non listés en détail, on utilise des valeurs par défaut
+const getDefaultRegionData = (name: string, flag: string): RegionData => ({
+  name,
+  flag,
+  climate: "Tempéré",
+  mainCrops: ["Céréales", "Légumes", "Fruits"],
+  livestock: ["Bovins", "Ovins", "Caprins"],
+  challenges: ["Changement climatique", "Accès aux marchés"],
+  opportunities: ["Agriculture durable", "Innovation technologique"],
+  languages: ["Langue officielle"],
+  currency: "Devise locale",
+  cities: ["Capitale"],
+  population: undefined,
+  gdpAgriculture: undefined,
+  area: undefined,
+  capital: "Capitale",
+  season: "Quatre saisons",
+  tempMin: 10,
+  tempMax: 25,
+  rainfall: 800,
+})
+
+// Liste étendue des pays (plus de 190)
+const allCountries: { name: string; code: string; flag: string; continent: string }[] = [
+  { name: "Afghanistan", code: "AF", flag: "🇦🇫", continent: "Asie" },
+  { name: "Afrique du Sud", code: "ZA", flag: "🇿🇦", continent: "Afrique" },
+  { name: "Albanie", code: "AL", flag: "🇦🇱", continent: "Europe" },
+  { name: "Algérie", code: "DZ", flag: "🇩🇿", continent: "Afrique" },
+  { name: "Allemagne", code: "DE", flag: "🇩🇪", continent: "Europe" },
+  { name: "Andorre", code: "AD", flag: "🇦🇩", continent: "Europe" },
+  { name: "Angola", code: "AO", flag: "🇦🇴", continent: "Afrique" },
+  { name: "Antigua-et-Barbuda", code: "AG", flag: "🇦🇬", continent: "Amériques" },
+  { name: "Arabie saoudite", code: "SA", flag: "🇸🇦", continent: "Asie" },
+  { name: "Argentine", code: "AR", flag: "🇦🇷", continent: "Amériques" },
+  { name: "Arménie", code: "AM", flag: "🇦🇲", continent: "Asie" },
+  { name: "Australie", code: "AU", flag: "🇦🇺", continent: "Océanie" },
+  { name: "Autriche", code: "AT", flag: "🇦🇹", continent: "Europe" },
+  { name: "Azerbaïdjan", code: "AZ", flag: "🇦🇿", continent: "Asie" },
+  { name: "Bahamas", code: "BS", flag: "🇧🇸", continent: "Amériques" },
+  { name: "Bahreïn", code: "BH", flag: "🇧🇭", continent: "Asie" },
+  { name: "Bangladesh", code: "BD", flag: "🇧🇩", continent: "Asie" },
+  { name: "Barbade", code: "BB", flag: "🇧🇧", continent: "Amériques" },
+  { name: "Belgique", code: "BE", flag: "🇧🇪", continent: "Europe" },
+  { name: "Belize", code: "BZ", flag: "🇧🇿", continent: "Amériques" },
+  { name: "Bénin", code: "BJ", flag: "🇧🇯", continent: "Afrique" },
+  { name: "Bhoutan", code: "BT", flag: "🇧🇹", continent: "Asie" },
+  { name: "Biélorussie", code: "BY", flag: "🇧🇾", continent: "Europe" },
+  { name: "Birmanie", code: "MM", flag: "🇲🇲", continent: "Asie" },
+  { name: "Bolivie", code: "BO", flag: "🇧🇴", continent: "Amériques" },
+  { name: "Bosnie-Herzégovine", code: "BA", flag: "🇧🇦", continent: "Europe" },
+  { name: "Botswana", code: "BW", flag: "🇧🇼", continent: "Afrique" },
+  { name: "Brésil", code: "BR", flag: "🇧🇷", continent: "Amériques" },
+  { name: "Brunei", code: "BN", flag: "🇧🇳", continent: "Asie" },
+  { name: "Bulgarie", code: "BG", flag: "🇧🇬", continent: "Europe" },
+  { name: "Burkina Faso", code: "BF", flag: "🇧🇫", continent: "Afrique" },
+  { name: "Burundi", code: "BI", flag: "🇧🇮", continent: "Afrique" },
+  { name: "Cambodge", code: "KH", flag: "🇰🇭", continent: "Asie" },
+  { name: "Cameroun", code: "CM", flag: "🇨🇲", continent: "Afrique" },
+  { name: "Canada", code: "CA", flag: "🇨🇦", continent: "Amériques" },
+  { name: "Cap-Vert", code: "CV", flag: "🇨🇻", continent: "Afrique" },
+  { name: "Centrafrique", code: "CF", flag: "🇨🇫", continent: "Afrique" },
+  { name: "Chili", code: "CL", flag: "🇨🇱", continent: "Amériques" },
+  { name: "Chine", code: "CN", flag: "🇨🇳", continent: "Asie" },
+  { name: "Chypre", code: "CY", flag: "🇨🇾", continent: "Europe" },
+  { name: "Colombie", code: "CO", flag: "🇨🇴", continent: "Amériques" },
+  { name: "Comores", code: "KM", flag: "🇰🇲", continent: "Afrique" },
+  { name: "Congo", code: "CG", flag: "🇨🇬", continent: "Afrique" },
+  { name: "Congo (RDC)", code: "CD", flag: "🇨🇩", continent: "Afrique" },
+  { name: "Corée du Nord", code: "KP", flag: "🇰🇵", continent: "Asie" },
+  { name: "Corée du Sud", code: "KR", flag: "🇰🇷", continent: "Asie" },
+  { name: "Costa Rica", code: "CR", flag: "🇨🇷", continent: "Amériques" },
+  { name: "Côte d'Ivoire", code: "CI", flag: "🇨🇮", continent: "Afrique" },
+  { name: "Croatie", code: "HR", flag: "🇭🇷", continent: "Europe" },
+  { name: "Cuba", code: "CU", flag: "🇨🇺", continent: "Amériques" },
+  { name: "Danemark", code: "DK", flag: "🇩🇰", continent: "Europe" },
+  { name: "Djibouti", code: "DJ", flag: "🇩🇯", continent: "Afrique" },
+  { name: "Dominique", code: "DM", flag: "🇩🇲", continent: "Amériques" },
+  { name: "Égypte", code: "EG", flag: "🇪🇬", continent: "Afrique" },
+  { name: "Émirats arabes unis", code: "AE", flag: "🇦🇪", continent: "Asie" },
+  { name: "Équateur", code: "EC", flag: "🇪🇨", continent: "Amériques" },
+  { name: "Érythrée", code: "ER", flag: "🇪🇷", continent: "Afrique" },
+  { name: "Espagne", code: "ES", flag: "🇪🇸", continent: "Europe" },
+  { name: "Estonie", code: "EE", flag: "🇪🇪", continent: "Europe" },
+  { name: "Eswatini", code: "SZ", flag: "🇸🇿", continent: "Afrique" },
+  { name: "États-Unis", code: "US", flag: "🇺🇸", continent: "Amériques" },
+  { name: "Éthiopie", code: "ET", flag: "🇪🇹", continent: "Afrique" },
+  { name: "Fidji", code: "FJ", flag: "🇫🇯", continent: "Océanie" },
+  { name: "Finlande", code: "FI", flag: "🇫🇮", continent: "Europe" },
+  { name: "France", code: "FR", flag: "🇫🇷", continent: "Europe" },
+  { name: "Gabon", code: "GA", flag: "🇬🇦", continent: "Afrique" },
+  { name: "Gambie", code: "GM", flag: "🇬🇲", continent: "Afrique" },
+  { name: "Géorgie", code: "GE", flag: "🇬🇪", continent: "Asie" },
+  { name: "Ghana", code: "GH", flag: "🇬🇭", continent: "Afrique" },
+  { name: "Grèce", code: "GR", flag: "🇬🇷", continent: "Europe" },
+  { name: "Grenade", code: "GD", flag: "🇬🇩", continent: "Amériques" },
+  { name: "Guatemala", code: "GT", flag: "🇬🇹", continent: "Amériques" },
+  { name: "Guinée", code: "GN", flag: "🇬🇳", continent: "Afrique" },
+  { name: "Guinée-Bissau", code: "GW", flag: "🇬🇼", continent: "Afrique" },
+  { name: "Guinée équatoriale", code: "GQ", flag: "🇬🇶", continent: "Afrique" },
+  { name: "Guyana", code: "GY", flag: "🇬🇾", continent: "Amériques" },
+  { name: "Haïti", code: "HT", flag: "🇭🇹", continent: "Amériques" },
+  { name: "Honduras", code: "HN", flag: "🇭🇳", continent: "Amériques" },
+  { name: "Hongrie", code: "HU", flag: "🇭🇺", continent: "Europe" },
+  { name: "Inde", code: "IN", flag: "🇮🇳", continent: "Asie" },
+  { name: "Indonésie", code: "ID", flag: "🇮🇩", continent: "Asie" },
+  { name: "Irak", code: "IQ", flag: "🇮🇶", continent: "Asie" },
+  { name: "Iran", code: "IR", flag: "🇮🇷", continent: "Asie" },
+  { name: "Irlande", code: "IE", flag: "🇮🇪", continent: "Europe" },
+  { name: "Islande", code: "IS", flag: "🇮🇸", continent: "Europe" },
+  { name: "Israël", code: "IL", flag: "🇮🇱", continent: "Asie" },
+  { name: "Italie", code: "IT", flag: "🇮🇹", continent: "Europe" },
+  { name: "Jamaïque", code: "JM", flag: "🇯🇲", continent: "Amériques" },
+  { name: "Japon", code: "JP", flag: "🇯🇵", continent: "Asie" },
+  { name: "Jordanie", code: "JO", flag: "🇯🇴", continent: "Asie" },
+  { name: "Kazakhstan", code: "KZ", flag: "🇰🇿", continent: "Asie" },
+  { name: "Kenya", code: "KE", flag: "🇰🇪", continent: "Afrique" },
+  { name: "Kirghizistan", code: "KG", flag: "🇰🇬", continent: "Asie" },
+  { name: "Kiribati", code: "KI", flag: "🇰🇮", continent: "Océanie" },
+  { name: "Koweït", code: "KW", flag: "🇰🇼", continent: "Asie" },
+  { name: "Laos", code: "LA", flag: "🇱🇦", continent: "Asie" },
+  { name: "Lesotho", code: "LS", flag: "🇱🇸", continent: "Afrique" },
+  { name: "Lettonie", code: "LV", flag: "🇱🇻", continent: "Europe" },
+  { name: "Liban", code: "LB", flag: "🇱🇧", continent: "Asie" },
+  { name: "Libéria", code: "LR", flag: "🇱🇷", continent: "Afrique" },
+  { name: "Libye", code: "LY", flag: "🇱🇾", continent: "Afrique" },
+  { name: "Liechtenstein", code: "LI", flag: "🇱🇮", continent: "Europe" },
+  { name: "Lituanie", code: "LT", flag: "🇱🇹", continent: "Europe" },
+  { name: "Luxembourg", code: "LU", flag: "🇱🇺", continent: "Europe" },
+  { name: "Macédoine du Nord", code: "MK", flag: "🇲🇰", continent: "Europe" },
+  { name: "Madagascar", code: "MG", flag: "🇲🇬", continent: "Afrique" },
+  { name: "Malaisie", code: "MY", flag: "🇲🇾", continent: "Asie" },
+  { name: "Malawi", code: "MW", flag: "🇲🇼", continent: "Afrique" },
+  { name: "Maldives", code: "MV", flag: "🇲🇻", continent: "Asie" },
+  { name: "Mali", code: "ML", flag: "🇲🇱", continent: "Afrique" },
+  { name: "Malte", code: "MT", flag: "🇲🇹", continent: "Europe" },
+  { name: "Maroc", code: "MA", flag: "🇲🇦", continent: "Afrique" },
+  { name: "Marshall", code: "MH", flag: "🇲🇭", continent: "Océanie" },
+  { name: "Maurice", code: "MU", flag: "🇲🇺", continent: "Afrique" },
+  { name: "Mauritanie", code: "MR", flag: "🇲🇷", continent: "Afrique" },
+  { name: "Mexique", code: "MX", flag: "🇲🇽", continent: "Amériques" },
+  { name: "Micronésie", code: "FM", flag: "🇫🇲", continent: "Océanie" },
+  { name: "Moldavie", code: "MD", flag: "🇲🇩", continent: "Europe" },
+  { name: "Monaco", code: "MC", flag: "🇲🇨", continent: "Europe" },
+  { name: "Mongolie", code: "MN", flag: "🇲🇳", continent: "Asie" },
+  { name: "Monténégro", code: "ME", flag: "🇲🇪", continent: "Europe" },
+  { name: "Mozambique", code: "MZ", flag: "🇲🇿", continent: "Afrique" },
+  { name: "Namibie", code: "NA", flag: "🇳🇦", continent: "Afrique" },
+  { name: "Nauru", code: "NR", flag: "🇳🇷", continent: "Océanie" },
+  { name: "Népal", code: "NP", flag: "🇳🇵", continent: "Asie" },
+  { name: "Nicaragua", code: "NI", flag: "🇳🇮", continent: "Amériques" },
+  { name: "Niger", code: "NE", flag: "🇳🇪", continent: "Afrique" },
+  { name: "Nigeria", code: "NG", flag: "🇳🇬", continent: "Afrique" },
+  { name: "Norvège", code: "NO", flag: "🇳🇴", continent: "Europe" },
+  { name: "Nouvelle-Zélande", code: "NZ", flag: "🇳🇿", continent: "Océanie" },
+  { name: "Oman", code: "OM", flag: "🇴🇲", continent: "Asie" },
+  { name: "Ouganda", code: "UG", flag: "🇺🇬", continent: "Afrique" },
+  { name: "Ouzbékistan", code: "UZ", flag: "🇺🇿", continent: "Asie" },
+  { name: "Pakistan", code: "PK", flag: "🇵🇰", continent: "Asie" },
+  { name: "Palaos", code: "PW", flag: "🇵🇼", continent: "Océanie" },
+  { name: "Panama", code: "PA", flag: "🇵🇦", continent: "Amériques" },
+  { name: "Papouasie-Nouvelle-Guinée", code: "PG", flag: "🇵🇬", continent: "Océanie" },
+  { name: "Paraguay", code: "PY", flag: "🇵🇾", continent: "Amériques" },
+  { name: "Pays-Bas", code: "NL", flag: "🇳🇱", continent: "Europe" },
+  { name: "Pérou", code: "PE", flag: "🇵🇪", continent: "Amériques" },
+  { name: "Philippines", code: "PH", flag: "🇵🇭", continent: "Asie" },
+  { name: "Pologne", code: "PL", flag: "🇵🇱", continent: "Europe" },
+  { name: "Portugal", code: "PT", flag: "🇵🇹", continent: "Europe" },
+  { name: "Qatar", code: "QA", flag: "🇶🇦", continent: "Asie" },
+  { name: "Roumanie", code: "RO", flag: "🇷🇴", continent: "Europe" },
+  { name: "Royaume-Uni", code: "GB", flag: "🇬🇧", continent: "Europe" },
+  { name: "Russie", code: "RU", flag: "🇷🇺", continent: "Europe/Asie" },
+  { name: "Rwanda", code: "RW", flag: "🇷🇼", continent: "Afrique" },
+  { name: "Saint-Christophe-et-Niévès", code: "KN", flag: "🇰🇳", continent: "Amériques" },
+  { name: "Sainte-Lucie", code: "LC", flag: "🇱🇨", continent: "Amériques" },
+  { name: "Saint-Marin", code: "SM", flag: "🇸🇲", continent: "Europe" },
+  { name: "Saint-Vincent-et-les-Grenadines", code: "VC", flag: "🇻🇨", continent: "Amériques" },
+  { name: "Salomon", code: "SB", flag: "🇸🇧", continent: "Océanie" },
+  { name: "Salvador", code: "SV", flag: "🇸🇻", continent: "Amériques" },
+  { name: "Samoa", code: "WS", flag: "🇼🇸", continent: "Océanie" },
+  { name: "Sao Tomé-et-Principe", code: "ST", flag: "🇸🇹", continent: "Afrique" },
+  { name: "Sénégal", code: "SN", flag: "🇸🇳", continent: "Afrique" },
+  { name: "Serbie", code: "RS", flag: "🇷🇸", continent: "Europe" },
+  { name: "Seychelles", code: "SC", flag: "🇸🇨", continent: "Afrique" },
+  { name: "Sierra Leone", code: "SL", flag: "🇸🇱", continent: "Afrique" },
+  { name: "Singapour", code: "SG", flag: "🇸🇬", continent: "Asie" },
+  { name: "Slovaquie", code: "SK", flag: "🇸🇰", continent: "Europe" },
+  { name: "Slovénie", code: "SI", flag: "🇸🇮", continent: "Europe" },
+  { name: "Somalie", code: "SO", flag: "🇸🇴", continent: "Afrique" },
+  { name: "Soudan", code: "SD", flag: "🇸🇩", continent: "Afrique" },
+  { name: "Soudan du Sud", code: "SS", flag: "🇸🇸", continent: "Afrique" },
+  { name: "Sri Lanka", code: "LK", flag: "🇱🇰", continent: "Asie" },
+  { name: "Suède", code: "SE", flag: "🇸🇪", continent: "Europe" },
+  { name: "Suisse", code: "CH", flag: "🇨🇭", continent: "Europe" },
+  { name: "Suriname", code: "SR", flag: "🇸🇷", continent: "Amériques" },
+  { name: "Syrie", code: "SY", flag: "🇸🇾", continent: "Asie" },
+  { name: "Tadjikistan", code: "TJ", flag: "🇹🇯", continent: "Asie" },
+  { name: "Tanzanie", code: "TZ", flag: "🇹🇿", continent: "Afrique" },
+  { name: "Tchad", code: "TD", flag: "🇹🇩", continent: "Afrique" },
+  { name: "Tchéquie", code: "CZ", flag: "🇨🇿", continent: "Europe" },
+  { name: "Thaïlande", code: "TH", flag: "🇹🇭", continent: "Asie" },
+  { name: "Timor oriental", code: "TL", flag: "🇹🇱", continent: "Asie" },
+  { name: "Togo", code: "TG", flag: "🇹🇬", continent: "Afrique" },
+  { name: "Tonga", code: "TO", flag: "🇹🇴", continent: "Océanie" },
+  { name: "Trinité-et-Tobago", code: "TT", flag: "🇹🇹", continent: "Amériques" },
+  { name: "Tunisie", code: "TN", flag: "🇹🇳", continent: "Afrique" },
+  { name: "Turkménistan", code: "TM", flag: "🇹🇲", continent: "Asie" },
+  { name: "Turquie", code: "TR", flag: "🇹🇷", continent: "Asie/Europe" },
+  { name: "Tuvalu", code: "TV", flag: "🇹🇻", continent: "Océanie" },
+  { name: "Ukraine", code: "UA", flag: "🇺🇦", continent: "Europe" },
+  { name: "Uruguay", code: "UY", flag: "🇺🇾", continent: "Amériques" },
+  { name: "Vanuatu", code: "VU", flag: "🇻🇺", continent: "Océanie" },
+  { name: "Vatican", code: "VA", flag: "🇻🇦", continent: "Europe" },
+  { name: "Venezuela", code: "VE", flag: "🇻🇪", continent: "Amériques" },
+  { name: "Vietnam", code: "VN", flag: "🇻🇳", continent: "Asie" },
+  { name: "Yémen", code: "YE", flag: "🇾🇪", continent: "Asie" },
+  { name: "Zambie", code: "ZM", flag: "🇿🇲", continent: "Afrique" },
+  { name: "Zimbabwe", code: "ZW", flag: "🇿🇼", continent: "Afrique" },
+]
+
+// Données détaillées pour certains pays (vous pouvez en ajouter d'autres)
+const detailedRegions: Record<string, RegionData> = {
+  "Burkina Faso": {
+    name: "Burkina Faso",
+    flag: "🇧🇫",
+    climate: "Sahélien",
+    mainCrops: ["Mil", "Sorgho", "Maïs", "Arachide", "Coton"],
+    livestock: ["Zébu", "Chèvres", "Moutons", "Volaille"],
+    challenges: ["Sécheresse", "Désertification", "Accès à l'eau"],
+    opportunities: ["Agriculture pluviale", "Élevage extensif", "Coopératives"],
+    languages: ["Français", "Mooré", "Dioula"],
+    currency: "CFA",
+    cities: ["Ouagadougou", "Bobo-Dioulasso", "Koudougou"],
+    population: 22673762,
+    gdpAgriculture: 31.2,
+    capital: "Ouagadougou",
+    season: "Saison sèche",
+    tempMin: 25,
+    tempMax: 38,
+    rainfall: 800,
+  },
+  "France": {
+    name: "France",
+    flag: "🇫🇷",
+    climate: "Tempéré océanique",
+    mainCrops: ["Blé", "Maïs", "Orge", "Betterave", "Vigne"],
+    livestock: ["Bovins", "Porcins", "Ovins", "Volaille"],
+    challenges: ["Concurrence internationale", "Dépendance aux intrants"],
+    opportunities: ["Agriculture biologique", "Vin AOC", "Innovation"],
+    languages: ["Français"],
+    currency: "Euro",
+    cities: ["Paris", "Lyon", "Marseille", "Bordeaux"],
+    population: 67800000,
+    gdpAgriculture: 1.7,
+    capital: "Paris",
+    season: "Quatre saisons",
+    tempMin: 5,
+    tempMax: 25,
+    rainfall: 700,
+  },
+  "Sénégal": {
+    name: "Sénégal",
+    flag: "🇸🇳",
+    climate: "Sahélien",
+    mainCrops: ["Arachide", "Riz", "Mil", "Mangue"],
+    livestock: ["Zébu", "Chèvres", "Moutons", "Volaille"],
+    challenges: ["Salinisation", "Exode rural"],
+    opportunities: ["Pêche", "Horticulture", "Tourisme rural"],
+    languages: ["Français", "Wolof", "Peul"],
+    currency: "CFA",
+    cities: ["Dakar", "Thiès", "Kaolack", "Saint-Louis"],
+    population: 17316449,
+    gdpAgriculture: 16.9,
+    capital: "Dakar",
+    season: "Saison sèche",
+    tempMin: 22,
+    tempMax: 35,
+    rainfall: 500,
+  },
+  "Mali": {
+    name: "Mali",
+    flag: "🇲🇱",
+    climate: "Sahélien",
+    mainCrops: ["Riz", "Mil", "Coton", "Arachide"],
+    livestock: ["Zébu", "Chèvres", "Moutons", "Dromadaires"],
+    challenges: ["Conflits", "Désertification"],
+    opportunities: ["Irrigation", "Élevage transhumant"],
+    languages: ["Français", "Bambara", "Peul"],
+    currency: "CFA",
+    cities: ["Bamako", "Sikasso", "Mopti", "Gao"],
+    population: 21904983,
+    gdpAgriculture: 38.5,
+    capital: "Bamako",
+    season: "Saison sèche",
+    tempMin: 20,
+    tempMax: 42,
+    rainfall: 600,
+  },
+  "Niger": {
+    name: "Niger",
+    flag: "🇳🇪",
+    climate: "Sahélien",
+    mainCrops: ["Mil", "Niébé", "Oignon", "Moringa"],
+    livestock: ["Zébu", "Chèvres", "Dromadaires"],
+    challenges: ["Désertification", "Insécurité", "Pauvreté"],
+    opportunities: ["Cultures irriguées", "Élevage nomade"],
+    languages: ["Français", "Haoussa", "Zarma"],
+    currency: "CFA",
+    cities: ["Niamey", "Zinder", "Maradi", "Agadez"],
+    population: 25130817,
+    gdpAgriculture: 40.2,
+    capital: "Niamey",
+    season: "Saison sèche",
+    tempMin: 28,
+    tempMax: 45,
+    rainfall: 200,
+  },
+  "Côte d'Ivoire": {
+    name: "Côte d'Ivoire",
+    flag: "🇨🇮",
+    climate: "Tropical",
+    mainCrops: ["Cacao", "Café", "Huile de palme", "Hévéa"],
+    livestock: ["Zébu", "Chèvres", "Moutons", "Volaille"],
+    challenges: ["Déforestation", "Prix des matières premières"],
+    opportunities: ["Agro-industrie", "Exportation", "Bio"],
+    languages: ["Français", "Dioula", "Baoulé"],
+    currency: "CFA",
+    cities: ["Abidjan", "Bouaké", "Yamoussoukro", "Daloa"],
+    population: 29389301,
+    gdpAgriculture: 22.1,
+    capital: "Yamoussoukro",
+    season: "Saison des pluies",
+    tempMin: 22,
+    tempMax: 32,
+    rainfall: 1500,
+  },
+  "Brésil": {
+    name: "Brésil",
+    flag: "🇧🇷",
+    climate: "Tropical",
+    mainCrops: ["Soja", "Maïs", "Café", "Canne à sucre", "Orange"],
+    livestock: ["Bovins", "Porcins", "Volaille"],
+    challenges: ["Déforestation", "Pression foncière"],
+    opportunities: ["Agro-industrie", "Biocarburants", "Exportation"],
+    languages: ["Portugais"],
+    currency: "Real",
+    cities: ["Brasilia", "São Paulo", "Rio de Janeiro", "Salvador"],
+    population: 213000000,
+    gdpAgriculture: 5.0,
+    capital: "Brasilia",
+    season: "Saisons inversées",
+    tempMin: 18,
+    tempMax: 32,
+    rainfall: 1200,
+  },
+  "Inde": {
+    name: "Inde",
+    flag: "🇮🇳",
+    climate: "Tropical/mousson",
+    mainCrops: ["Riz", "Blé", "Coton", "Canne à sucre", "Épices"],
+    livestock: ["Bovins", "Buffles", "Caprins"],
+    challenges: ["Sous-alimentation", "Pression démographique"],
+    opportunities: ["Irrigation", "Agriculture contractuelle"],
+    languages: ["Hindi", "Anglais", "Tamoul", "Télougou"],
+    currency: "Roupie",
+    cities: ["New Delhi", "Mumbai", "Kolkata", "Chennai"],
+    population: 1380000000,
+    gdpAgriculture: 16.5,
+    capital: "New Delhi",
+    season: "Mousson",
+    tempMin: 15,
+    tempMax: 40,
+    rainfall: 1100,
+  },
+  "Chine": {
+    name: "Chine",
+    flag: "🇨🇳",
+    climate: "Divers",
+    mainCrops: ["Riz", "Blé", "Maïs", "Pomme de terre", "Coton"],
+    livestock: ["Porcins", "Volaille", "Bovins"],
+    challenges: ["Pollution", "Urbanisation rapide"],
+    opportunities: ["Technologie agricole", "Aquaculture"],
+    languages: ["Mandarin"],
+    currency: "Yuan",
+    cities: ["Pékin", "Shanghai", "Canton", "Shenzhen"],
+    population: 1410000000,
+    gdpAgriculture: 7.5,
+    capital: "Pékin",
+    season: "Quatre saisons",
+    tempMin: -5,
+    tempMax: 30,
+    rainfall: 600,
+  },
+  "États-Unis": {
+    name: "États-Unis",
+    flag: "🇺🇸",
+    climate: "Tempéré",
+    mainCrops: ["Maïs", "Soja", "Blé", "Coton", "Fruits"],
+    livestock: ["Bovins", "Porcins", "Volaille"],
+    challenges: ["Érosion des sols", "Concurrence"],
+    opportunities: ["Biotechnologies", "Exportations massives"],
+    languages: ["Anglais"],
+    currency: "Dollar",
+    cities: ["Washington", "New York", "Los Angeles", "Chicago"],
+    population: 331000000,
+    gdpAgriculture: 0.9,
+    capital: "Washington D.C.",
+    season: "Quatre saisons",
+    tempMin: -10,
+    tempMax: 35,
+    rainfall: 700,
+  },
 }
 
-// Traductions
-const translations: Record<string, any> = {
-  fr: {
+// Fonction pour obtenir les données d'une région (avec fallback par défaut)
+const getRegionData = (countryName: string): RegionData => {
+  if (detailedRegions[countryName]) return detailedRegions[countryName]
+  const country = allCountries.find(c => c.name === countryName)
+  const flag = country?.flag || "🌍"
+  return getDefaultRegionData(countryName, flag)
+}
+
+export default function RegionalAdaptation({ currentLanguage, userRegion, onRegionChange }: RegionalAdaptationProps) {
+  const [searchQuery, setSearchQuery] = useState("")
+  const [activeTab, setActiveTab] = useState("overview")
+  const [language, setLanguage] = useState(currentLanguage)
+  const [refreshing, setRefreshing] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [regionWeather, setRegionWeather] = useState({ temp: 32, icon: "☀️", humidity: 45 })
+
+  const isOnline = useOnlineStatus()
+  const debouncedSearch = useDebounce(searchQuery, 300)
+  const [favoriteRegions, setFavoriteRegions] = useLocalStorage<string[]>("favoriteRegions", [])
+  const [lastViewedRegion, setLastViewedRegion] = useLocalStorage("lastViewedRegion", userRegion)
+
+  const t = {
     title: "Adaptation Régionale",
-    subtitle: "Données agricoles adaptées à votre région",
+    subtitle: "Données agricoles pour tous les pays",
     online: "En ligne",
     offline: "Hors ligne",
     refresh: "Actualiser",
@@ -96,199 +523,34 @@ const translations: Record<string, any> = {
     challenges: "Défis",
     opportunities: "Opportunités",
     weather: "Météo",
-    calendar: "Calendrier agricole",
+    calendar: "Calendrier",
     mainCrops: "Cultures principales",
     livestock: "Élevage",
     cities: "Villes principales",
     languages: "Langues",
     currency: "Monnaie",
-    searchPlaceholder: "Rechercher une région...",
-    favoriteRegions: "Régions favorites",
-    noFavorites: "Aucune région favorite",
+    searchPlaceholder: "Rechercher un pays...",
+    favoriteRegions: "Pays favoris",
+    noFavorites: "Aucun favori",
     addToFavorites: "Ajouter aux favoris",
-    removeFromFavorites: "Retirer des favoris",
+    removeFromFavorites: "Retirer",
     loading: "Chargement...",
     drySeason: "Saison sèche",
     rainySeason: "Saison des pluies",
     recommendations: "Recommandations",
-    jan: "Jan", feb: "Fév", mar: "Mar", apr: "Avr", may: "Mai", jun: "Juin",
-    jul: "Juil", aug: "Aoû", sep: "Sep", oct: "Oct", nov: "Nov", dec: "Déc",
-  },
-  en: {
-    title: "Regional Adaptation",
-    subtitle: "Agricultural data adapted to your region",
-    online: "Online",
-    offline: "Offline",
-    refresh: "Refresh",
-    climate: "Climate",
-    population: "Population",
-    area: "Area",
-    capital: "Capital",
-    temperature: "Temperature",
-    season: "Season",
-    rainfall: "Rainfall",
-    gdpAgriculture: "GDP Agriculture",
-    overview: "Overview",
-    agriculture: "Agriculture",
-    challenges: "Challenges",
-    opportunities: "Opportunities",
-    weather: "Weather",
-    calendar: "Agricultural calendar",
-    mainCrops: "Main crops",
-    livestock: "Livestock",
-    cities: "Main cities",
-    languages: "Languages",
-    currency: "Currency",
-    searchPlaceholder: "Search region...",
-    favoriteRegions: "Favorite regions",
-    noFavorites: "No favorite regions",
-    addToFavorites: "Add to favorites",
-    removeFromFavorites: "Remove from favorites",
-    loading: "Loading...",
-    drySeason: "Dry season",
-    rainySeason: "Rainy season",
-    recommendations: "Recommendations",
-    jan: "Jan", feb: "Feb", mar: "Mar", apr: "Apr", may: "May", jun: "Jun",
-    jul: "Jul", aug: "Aug", sep: "Sep", oct: "Oct", nov: "Nov", dec: "Dec",
-  },
-}
-
-// Données des régions
-const regions: Record<string, RegionData> = {
-  "Burkina Faso": {
-    name: "Burkina Faso",
-    flag: "🇧🇫",
-    climate: "Sahélien",
-    mainCrops: ["Mil", "Sorgho", "Maïs", "Arachide", "Coton", "Niébé", "Sésame"],
-    livestock: ["Zébu", "Chèvres", "Moutons", "Volaille", "Porcins"],
-    challenges: ["Sécheresse", "Désertification", "Accès à l'eau", "Changement climatique"],
-    opportunities: ["Agriculture pluviale", "Élevage extensif", "Transformation locale", "Coopératives"],
-    languages: ["Français", "Mooré", "Dioula", "Fulfuldé"],
-    currency: "CFA",
-    cities: ["Ouagadougou", "Bobo-Dioulasso", "Koudougou", "Banfora", "Ouahigouya"],
-    population: 22673762,
-    gdpAgriculture: 31.2,
-    area: 274200,
-    capital: "Ouagadougou",
-    season: "Saison sèche",
-    tempMin: 25,
-    tempMax: 38,
-    rainfall: 800,
-  },
-  Mali: {
-    name: "Mali",
-    flag: "🇲🇱",
-    climate: "Sahélien/Soudanien",
-    mainCrops: ["Riz", "Mil", "Coton", "Arachide", "Fonio", "Maïs"],
-    livestock: ["Zébu", "Chèvres", "Moutons", "Dromadaires"],
-    challenges: ["Conflit", "Changement climatique", "Accès aux marchés", "Désertification"],
-    opportunities: ["Irrigation", "Pêche", "Élevage transhumant", "Mines"],
-    languages: ["Français", "Bambara", "Peul", "Soninké"],
-    currency: "CFA",
-    cities: ["Bamako", "Sikasso", "Mopti", "Ségou", "Gao"],
-    population: 21904983,
-    gdpAgriculture: 38.5,
-    area: 1241000,
-    capital: "Bamako",
-    season: "Saison sèche",
-    tempMin: 20,
-    tempMax: 42,
-    rainfall: 600,
-  },
-  Sénégal: {
-    name: "Sénégal",
-    flag: "🇸🇳",
-    climate: "Sahélien/Soudanien",
-    mainCrops: ["Arachide", "Riz", "Mil", "Mangue", "Pastèque", "Tomate"],
-    livestock: ["Zébu", "Chèvres", "Moutons", "Volaille"],
-    challenges: ["Salinisation", "Exode rural", "Accès au crédit", "Pêche illégale"],
-    opportunities: ["Pêche", "Horticulture", "Tourisme rural", "Énergie solaire"],
-    languages: ["Français", "Wolof", "Peul", "Serer", "Diola"],
-    currency: "CFA",
-    cities: ["Dakar", "Thiès", "Kaolack", "Saint-Louis", "Ziguinchor"],
-    population: 17316449,
-    gdpAgriculture: 16.9,
-    area: 196722,
-    capital: "Dakar",
-    season: "Saison sèche",
-    tempMin: 22,
-    tempMax: 35,
-    rainfall: 500,
-  },
-  Niger: {
-    name: "Niger",
-    flag: "🇳🇪",
-    climate: "Sahélien/Saharien",
-    mainCrops: ["Mil", "Niébé", "Oignon", "Moringa", "Sorgho"],
-    livestock: ["Zébu", "Chèvres", "Dromadaires", "Moutons"],
-    challenges: ["Désertification", "Insécurité", "Pauvreté", "Accès à l'eau"],
-    opportunities: ["Cultures irriguées", "Élevage nomade", "Mines d'uranium", "Artisanat"],
-    languages: ["Français", "Haoussa", "Zarma", "Peul"],
-    currency: "CFA",
-    cities: ["Niamey", "Zinder", "Maradi", "Tahoua", "Agadez"],
-    population: 25130817,
-    gdpAgriculture: 40.2,
-    area: 1267000,
-    capital: "Niamey",
-    season: "Saison sèche",
-    tempMin: 28,
-    tempMax: 45,
-    rainfall: 200,
-  },
-  "Côte d'Ivoire": {
-    name: "Côte d'Ivoire",
-    flag: "🇨🇮",
-    climate: "Tropical",
-    mainCrops: ["Cacao", "Café", "Huile de palme", "Hévéa", "Ananas", "Banane"],
-    livestock: ["Zébu", "Chèvres", "Moutons", "Volaille", "Porcins"],
-    challenges: ["Déforestation", "Prix des matières premières", "Conflits fonciers"],
-    opportunities: ["Agro-industrie", "Exportation", "Transformation locale", "Bio"],
-    languages: ["Français", "Dioula", "Baoulé", "Bété", "Sénoufo"],
-    currency: "CFA",
-    cities: ["Abidjan", "Bouaké", "Yamoussoukro", "Daloa", "San-Pédro"],
-    population: 29389301,
-    gdpAgriculture: 22.1,
-    area: 322463,
-    capital: "Yamoussoukro",
-    season: "Saison des pluies",
-    tempMin: 22,
-    tempMax: 32,
-    rainfall: 1500,
-  },
-}
-
-// Données météo simulées
-const getRegionWeather = (region: string): { temp: number; icon: string; humidity: number } => {
-  const regionData = regions[region] || regions["Burkina Faso"]
-  return {
-    temp: Math.floor((regionData.tempMin + regionData.tempMax) / 2),
-    icon: regionData.season === "Saison des pluies" ? "🌧️" : "☀️",
-    humidity: regionData.season === "Saison des pluies" ? 70 : 40,
   }
-}
 
-export default function RegionalAdaptation({ currentLanguage, userRegion, onRegionChange }: RegionalAdaptationProps) {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [activeTab, setActiveTab] = useState("overview")
-  const [language, setLanguage] = useState(currentLanguage)
-  const [refreshing, setRefreshing] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [regionWeather, setRegionWeather] = useState({ temp: 32, icon: "☀️", humidity: 45 })
+  const currentRegionData = getRegionData(userRegion)
 
-  const isOnline = useOnlineStatus()
-  const debouncedSearch = useDebounce(searchQuery, 300)
-  const [favoriteRegions, setFavoriteRegions] = useLocalStorage<string[]>("favoriteRegions", [])
-  const [lastViewedRegion, setLastViewedRegion] = useLocalStorage("lastViewedRegion", userRegion)
-
-  const t = translations[language as keyof typeof translations] || translations.fr
-  const currentRegionData = regions[userRegion] || regions["Burkina Faso"]
-
-  // Mettre à jour la météo quand la région change
+  // Météo simulée basée sur la région
   useEffect(() => {
     if (isOnline) {
-      setRegionWeather(getRegionWeather(userRegion))
+      const temp = currentRegionData.tempMin ? (currentRegionData.tempMin + (currentRegionData.tempMax || 30)) / 2 : 25
+      const icon = currentRegionData.season === "Saison des pluies" ? "🌧️" : "☀️"
+      const humidity = currentRegionData.season === "Saison des pluies" ? 70 : 45
+      setRegionWeather({ temp: Math.round(temp), icon, humidity })
     }
-  }, [userRegion, isOnline])
+  }, [userRegion, isOnline, currentRegionData])
 
   useEffect(() => {
     setLanguage(currentLanguage)
@@ -313,42 +575,19 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
     setRefreshing(true)
     try {
       await new Promise(resolve => setTimeout(resolve, 500))
-      setRegionWeather(getRegionWeather(userRegion))
+      setRegionWeather(prev => ({ ...prev, temp: prev.temp + (Math.random() * 2 - 1) }))
       showToast("Données actualisées", "success")
     } catch {
       showToast("Erreur lors de l'actualisation", "error")
     } finally {
       setRefreshing(false)
     }
-  }, [isOnline, userRegion])
+  }, [isOnline])
 
-  const filteredCountries = Object.keys(regions).filter((country) =>
-    country.toLowerCase().includes(debouncedSearch.toLowerCase())
+  // Filtrer les pays selon la recherche
+  const filteredCountries = allCountries.filter(country =>
+    country.name.toLowerCase().includes(debouncedSearch.toLowerCase())
   )
-
-  // Prévisions météo
-  const forecast: WeatherForecast[] = [
-    { day: t.jan, temp: currentRegionData.tempMin || 25, icon: "☀️" },
-    { day: t.feb, temp: (currentRegionData.tempMin || 25) + 2, icon: "☀️" },
-    { day: t.mar, temp: (currentRegionData.tempMin || 25) + 5, icon: "☀️" },
-    { day: t.apr, temp: (currentRegionData.tempMin || 25) + 8, icon: "⛅" },
-    { day: t.may, temp: (currentRegionData.tempMin || 25) + 10, icon: "⛅" },
-    { day: t.jun, temp: (currentRegionData.tempMin || 25) + 8, icon: "🌧️" },
-    { day: t.jul, temp: (currentRegionData.tempMin || 25) + 6, icon: "🌧️" },
-    { day: t.aug, temp: (currentRegionData.tempMin || 25) + 5, icon: "🌧️" },
-    { day: t.sep, temp: (currentRegionData.tempMin || 25) + 5, icon: "🌧️" },
-    { day: t.oct, temp: (currentRegionData.tempMin || 25) + 7, icon: "⛅" },
-    { day: t.nov, temp: (currentRegionData.tempMin || 25) + 4, icon: "☀️" },
-    { day: t.dec, temp: currentRegionData.tempMin || 25, icon: "☀️" },
-  ]
-
-  const recommendations = [
-    "🌱 Plantez du niébé après les céréales pour fixer l'azote dans le sol",
-    "💧 Utilisez le paillage pour réduire l'évaporation et conserver l'humidité",
-    "🐔 Vaccinez vos volailles contre Newcastle à 4 semaines",
-    "🌾 Stockez vos récoltes à l'abri de l'humidité pour éviter les moisissures",
-    "🚜 Pratiquez la rotation des cultures pour préserver la fertilité des sols",
-  ]
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -373,7 +612,7 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
         </Button>
       </div>
 
-      {/* Sélecteur de région */}
+      {/* Sélecteur de pays */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -390,14 +629,14 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
           onChange={(e) => onRegionChange(e.target.value)}
         >
           {filteredCountries.map((country) => (
-            <option key={country} value={country}>
-              {regions[country].flag} {country}
+            <option key={country.code} value={country.name}>
+              {country.flag} {country.name}
             </option>
           ))}
         </select>
       </div>
 
-      {/* Régions favorites */}
+      {/* Pays favoris */}
       {favoriteRegions.length > 0 && (
         <div className="flex flex-wrap gap-2">
           <span className="text-xs text-gray-500">{t.favoriteRegions}:</span>
@@ -407,13 +646,13 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
               onClick={() => onRegionChange(region)}
               className="text-xs bg-gray-100 hover:bg-gray-200 rounded-full px-2 py-0.5 transition-colors"
             >
-              {regions[region]?.flag} {region}
+              {allCountries.find(c => c.name === region)?.flag || "🌍"} {region}
             </button>
           ))}
         </div>
       )}
 
-      {/* Vue d'ensemble de la région */}
+      {/* Vue d'ensemble du pays */}
       <Card className="bg-gradient-to-r from-green-600 to-blue-700 text-white overflow-hidden relative">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32" />
         <CardContent className="p-5 relative z-10">
@@ -458,7 +697,7 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
             </div>
             <div className="text-center bg-white/10 rounded-lg p-2 backdrop-blur-sm">
               <Leaf className="h-5 w-5 mx-auto mb-1" />
-              <div className="text-lg md:text-xl font-bold">{currentRegionData.gdpAgriculture}%</div>
+              <div className="text-lg md:text-xl font-bold">{currentRegionData.gdpAgriculture || "N/A"}%</div>
               <div className="text-xs text-green-100">{t.gdpAgriculture}</div>
             </div>
           </div>
@@ -483,7 +722,7 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
             </Card>
             <Card>
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Globe className="h-5 w-5 text-green-600" />{t.languages}</CardTitle></CardHeader>
-              <CardContent><div className="flex flex-wrap gap-2">{currentRegionData.languages.map(lang => (<Badge key={lang} variant="outline">{lang}</Badge>))}</div><p className="mt-3 text-sm text-gray-600">💱 {t.currency}: {currentRegionData.currency}</p><p className="text-sm text-gray-600">📐 {t.area}: {currentRegionData.area?.toLocaleString()} km²</p></CardContent>
+              <CardContent><div className="flex flex-wrap gap-2">{currentRegionData.languages.map(lang => (<Badge key={lang} variant="outline">{lang}</Badge>))}</div><p className="mt-3 text-sm text-gray-600">💱 {t.currency}: {currentRegionData.currency}</p></CardContent>
             </Card>
           </div>
 
@@ -499,10 +738,10 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
             </Card>
           </div>
 
-          {/* Recommandations */}
+          {/* Recommandations génériques */}
           <Card className="bg-blue-50 border-blue-200">
             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Award className="h-5 w-5 text-blue-600" />{t.recommendations}</CardTitle></CardHeader>
-            <CardContent><div className="space-y-2">{recommendations.slice(0, 3).map((rec, i) => (<p key={i} className="text-sm text-blue-800">• {rec}</p>))}</div></CardContent>
+            <CardContent><div className="space-y-2"><p className="text-sm text-blue-800">• Adaptez vos pratiques agricoles au climat local</p><p className="text-sm text-blue-800">• Utilisez des semences résistantes à la sécheresse si besoin</p><p className="text-sm text-blue-800">• Rejoignez des coopératives pour mutualiser les ressources</p></div></CardContent>
           </Card>
         </TabsContent>
 
@@ -523,52 +762,16 @@ export default function RegionalAdaptation({ currentLanguage, userRegion, onRegi
         {/* Onglet Météo */}
         <TabsContent value="weather" className="mt-4">
           <Card>
-            <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Sun className="h-5 w-5" />Prévisions annuelles</CardTitle></CardHeader>
-            <CardContent>
-              <div className="flex overflow-x-auto pb-2 gap-2">
-                {forecast.map((day, i) => (
-                  <div key={i} className="text-center min-w-[60px] p-2 bg-gray-50 rounded-lg">
-                    <p className="text-xs font-medium">{day.day}</p>
-                    <div className="text-xl my-1">{day.icon}</div>
-                    <p className="text-xs font-bold">{day.temp}°</p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Info className="h-4 w-4 text-blue-600" />
-                  <p className="text-sm text-blue-800">{currentRegionData.season === "Saison des pluies" ? "Période favorable pour les semis" : "Période idéale pour les récoltes"}</p>
-                </div>
-              </div>
-            </CardContent>
+            <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Sun className="h-5 w-5" />Informations climatiques</CardTitle></CardHeader>
+            <CardContent><div className="grid grid-cols-2 gap-3"><div><p className="text-sm font-medium">Saison principale</p><p className="text-lg">{currentRegionData.season}</p></div><div><p className="text-sm font-medium">Température moyenne</p><p className="text-lg">{regionWeather.temp}°C</p></div><div><p className="text-sm font-medium">Précipitations annuelles</p><p className="text-lg">{currentRegionData.rainfall} mm</p></div><div><p className="text-sm font-medium">Humidité moyenne</p><p className="text-lg">{regionWeather.humidity}%</p></div></div></CardContent>
           </Card>
         </TabsContent>
 
-        {/* Onglet Calendrier agricole */}
+        {/* Onglet Calendrier */}
         <TabsContent value="calendar" className="mt-4">
           <Card>
-            <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Calendar className="h-5 w-5" />Calendrier des activités</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              {[
-                { month: "Jan-Fév", activity: "Préparation des sols", icon: "🚜" },
-                { month: "Mar-Avr", activity: "Semis du maïs et sorgho", icon: "🌱" },
-                { month: "Mai-Juin", activity: "Entretien des cultures", icon: "🧑‍🌾" },
-                { month: "Juil-Aoû", activity: "Sarclage et fertilisation", icon: "🌿" },
-                { month: "Sep-Oct", activity: "Début des récoltes", icon: "🌾" },
-                { month: "Nov-Déc", activity: "Stockage et commercialisation", icon: "🏪" },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{item.icon}</span>
-                    <div>
-                      <p className="font-medium text-sm">{item.month}</p>
-                      <p className="text-xs text-gray-500">{item.activity}</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-gray-400" />
-                </div>
-              ))}
-            </CardContent>
+            <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Calendar className="h-5 w-5" />Calendrier agricole indicatif</CardTitle></CardHeader>
+            <CardContent><div className="space-y-3"><div className="flex justify-between items-center p-2 border-b"><span>Préparation des sols</span><Badge>Mars - Avril</Badge></div><div className="flex justify-between items-center p-2 border-b"><span>Semis principales cultures</span><Badge>Mai - Juin</Badge></div><div className="flex justify-between items-center p-2 border-b"><span>Entretien / Fertilisation</span><Badge>Juillet - Août</Badge></div><div className="flex justify-between items-center p-2"><span>Récoltes</span><Badge>Septembre - Octobre</Badge></div></div></CardContent>
           </Card>
         </TabsContent>
       </Tabs>
