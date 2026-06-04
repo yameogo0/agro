@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   MessageSquare,
   Send,
@@ -26,7 +27,33 @@ import {
   ImageIcon,
   File,
   Mic,
+  Pi,
+  Wallet,
+  Check,
+  Clock,
+  Reply,
+  Copy,
+  Trash2,
+  Pin,
+  Archive,
+  Flag,
+  Volume2,
+  VolumeX,
+  Download,
+  Share2,
+  ExternalLink,
+  X,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Wifi,
+  WifiOff,
 } from "lucide-react"
+import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useDebounce } from "@/hooks/use-debounce"
+import { useOnlineStatus } from "@/hooks/use-online-status"
+import { usePiAuth } from "@/contexts/pi-auth-context"
+import { showToast, formatRelativeTime } from "@/lib/utils"
 
 interface Message {
   id: string
@@ -35,9 +62,10 @@ interface Message {
   content: string
   timestamp: string
   read: boolean
-  type: "text" | "image" | "file" | "audio"
-  fileUrl?: string
-  fileName?: string
+  delivered: boolean
+  type: "text" | "image" | "file" | "audio" | "payment"
+  amount?: number
+  replyTo?: Message
 }
 
 interface Conversation {
@@ -50,6 +78,8 @@ interface Conversation {
     lastSeen?: string
     location?: string
     profession?: string
+    rating?: number
+    verified?: boolean
   }[]
   lastMessage: Message
   unreadCount: number
@@ -57,6 +87,8 @@ interface Conversation {
   archived: boolean
   isGroup?: boolean
   groupName?: string
+  groupAvatar?: string
+  groupMembers?: number
 }
 
 interface MessagingSystemProps {
@@ -64,568 +96,642 @@ interface MessagingSystemProps {
   userRegion: string
 }
 
+// Traductions
+const translations: Record<string, any> = {
+  fr: {
+    messages: "Messages",
+    search: "Rechercher une conversation...",
+    noConversations: "Aucune conversation",
+    noMessages: "Aucun message",
+    typeMessage: "Écrivez votre message...",
+    online: "En ligne",
+    offline: "Hors ligne",
+    yesterday: "Hier",
+    copied: "Copié",
+    paymentRequest: "Demande de paiement",
+    amount: "Montant",
+    send: "Envoyer",
+    pay: "Payer",
+    cancel: "Annuler",
+    reply: "Répondre",
+    delete: "Supprimer",
+    copy: "Copier",
+    pin: "Épingler",
+    archive: "Archiver",
+    unarchive: "Désarchiver",
+    loading: "Chargement...",
+    today: "Aujourd'hui",
+    thisWeek: "Cette semaine",
+    thisMonth: "Ce mois-ci",
+    older: "Plus ancien",
+    typing: "est en train d'écrire...",
+    selectConversation: "Sélectionnez une conversation",
+    selectConversationDesc: "Choisissez un contact pour commencer à discuter",
+    discoverUsers: "Découvrir des utilisateurs",
+    archived: "Archivés",
+    all: "Tous",
+  },
+  en: {
+    messages: "Messages",
+    search: "Search conversations...",
+    noConversations: "No conversations",
+    noMessages: "No messages",
+    typeMessage: "Type your message...",
+    online: "Online",
+    offline: "Offline",
+    yesterday: "Yesterday",
+    copied: "Copied",
+    paymentRequest: "Payment request",
+    amount: "Amount",
+    send: "Send",
+    pay: "Pay",
+    cancel: "Cancel",
+    reply: "Reply",
+    delete: "Delete",
+    copy: "Copy",
+    pin: "Pin",
+    archive: "Archive",
+    unarchive: "Unarchive",
+    loading: "Loading...",
+    today: "Today",
+    thisWeek: "This week",
+    thisMonth: "This month",
+    older: "Older",
+    typing: "is typing...",
+    selectConversation: "Select a conversation",
+    selectConversationDesc: "Choose a contact to start chatting",
+    discoverUsers: "Discover users",
+    archived: "Archived",
+    all: "All",
+  },
+}
+
+// Données de démonstration
+const demoConversations: Conversation[] = [
+  {
+    id: "1",
+    participants: [{
+      id: "user1",
+      name: "Dr. Aminata Traoré",
+      avatar: "AT",
+      online: true,
+      location: "Ouagadougou",
+      profession: "Vétérinaire",
+      rating: 4.9,
+      verified: true,
+    }],
+    lastMessage: {
+      id: "msg1",
+      senderId: "user1",
+      senderName: "Dr. Aminata Traoré",
+      content: "Bonjour, comment puis-je vous aider avec votre élevage ?",
+      timestamp: new Date(Date.now() - 3600000).toISOString(),
+      read: false,
+      delivered: true,
+      type: "text",
+    },
+    unreadCount: 2,
+    pinned: false,
+    archived: false,
+  },
+  {
+    id: "2",
+    participants: [{
+      id: "user2",
+      name: "Coopérative YELEN",
+      avatar: "CY",
+      online: false,
+      lastSeen: new Date(Date.now() - 1800000).toISOString(),
+      location: "Bobo-Dioulasso",
+      profession: "Coopérative agricole",
+      rating: 4.7,
+      verified: true,
+    }],
+    lastMessage: {
+      id: "msg2",
+      senderId: "current",
+      senderName: "Vous",
+      content: "Quels sont vos prix pour les aliments ?",
+      timestamp: new Date(Date.now() - 7200000).toISOString(),
+      read: true,
+      delivered: true,
+      type: "text",
+    },
+    unreadCount: 0,
+    pinned: true,
+    archived: false,
+    isGroup: true,
+    groupName: "Coopérative YELEN",
+    groupMembers: 12,
+  },
+  {
+    id: "3",
+    participants: [{
+      id: "user3",
+      name: "Ibrahim Sawadogo",
+      avatar: "IS",
+      online: true,
+      location: "Koudougou",
+      profession: "Agriculteur",
+      rating: 4.6,
+      verified: false,
+    }],
+    lastMessage: {
+      id: "msg3",
+      senderId: "user3",
+      senderName: "Ibrahim Sawadogo",
+      content: "Merci pour les semences, très bonne qualité !",
+      timestamp: new Date(Date.now() - 86400000).toISOString(),
+      read: true,
+      delivered: true,
+      type: "text",
+    },
+    unreadCount: 0,
+    pinned: false,
+    archived: false,
+  },
+]
+
 export default function MessagingSystem({ currentLanguage, userRegion }: MessagingSystemProps) {
   const [activeConversation, setActiveConversation] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("messages")
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentAmount, setPaymentAmount] = useState("")
+  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null)
+  const [isSending, setIsSending] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [showSidebar, setShowSidebar] = useState(true)
 
-  const conversations: Conversation[] = [
-    {
-      id: "conv1",
-      participants: [
-        {
-          id: "user1",
-          name: "Dr. Moussa Koné",
-          avatar: "/placeholder.svg?height=40&width=40&text=MK",
-          online: true,
-          location: "Bobo-Dioulasso, Mali",
-          profession: "Vétérinaire",
-        },
-      ],
-      lastMessage: {
-        id: "msg1",
+  const isOnline = useOnlineStatus()
+  const { userData } = usePiAuth()
+  const debouncedSearch = useDebounce(searchQuery, 300)
+
+  const [conversations, setConversations] = useLocalStorage<Conversation[]>("conversations", demoConversations)
+  const [messages, setMessages] = useLocalStorage<Record<string, Message[]>>("messages", {
+    "1": [
+      {
+        id: "m1",
         senderId: "user1",
-        senderName: "Dr. Moussa Koné",
-        content: "Bonjour, j'ai reçu votre demande de consultation. Je peux vous aider avec votre élevage.",
-        timestamp: "2024-02-01T10:30:00Z",
-        read: false,
+        senderName: "Dr. Aminata Traoré",
+        content: "Bonjour ! Comment puis-je vous aider ?",
+        timestamp: new Date(Date.now() - 86400000).toISOString(),
+        read: true,
+        delivered: true,
         type: "text",
       },
-      unreadCount: 2,
-      pinned: true,
-      archived: false,
-    },
-    {
-      id: "conv2",
-      participants: [
-        {
-          id: "user2",
-          name: "Marie Ouédraogo",
-          avatar: "/placeholder.svg?height=40&width=40&text=MO",
-          online: false,
-          lastSeen: "2024-02-01T08:15:00Z",
-          location: "Kaya, Burkina Faso",
-          profession: "Éleveuse",
-        },
-      ],
-      lastMessage: {
-        id: "msg2",
+      {
+        id: "m2",
         senderId: "current",
         senderName: "Vous",
-        content: "Merci pour les conseils sur la nutrition. Mes poules pondent beaucoup mieux maintenant !",
-        timestamp: "2024-01-31T16:45:00Z",
+        content: "J'ai besoin de conseils pour la vaccination de mes poules.",
+        timestamp: new Date(Date.now() - 82800000).toISOString(),
         read: true,
+        delivered: true,
         type: "text",
       },
-      unreadCount: 0,
-      pinned: false,
-      archived: false,
-    },
-    {
-      id: "conv3",
-      participants: [
-        {
-          id: "user3",
-          name: "Ibrahim Sawadogo",
-          avatar: "/placeholder.svg?height=40&width=40&text=IS",
-          online: true,
-          location: "Koudougou, Burkina Faso",
-          profession: "Agriculteur",
-        },
-      ],
-      lastMessage: {
-        id: "msg3",
-        senderId: "user3",
-        senderName: "Ibrahim Sawadogo",
-        content: "Pouvez-vous me recommander un bon fournisseur d'aliments pour volailles dans la région ?",
-        timestamp: "2024-01-30T14:20:00Z",
-        read: false,
-        type: "text",
-      },
-      unreadCount: 1,
-      pinned: false,
-      archived: false,
-    },
-    {
-      id: "conv4",
-      participants: [
-        {
-          id: "user4",
-          name: "Groupe Aviculture BF",
-          avatar: "/placeholder.svg?height=40&width=40&text=GA",
-          online: false,
-          lastSeen: "2024-01-29T12:00:00Z",
-        },
-      ],
-      lastMessage: {
-        id: "msg4",
-        senderId: "user4",
-        senderName: "Groupe Aviculture BF",
-        content: "Nouvelle formation disponible sur les techniques d'élevage modernes. Intéressé ?",
-        timestamp: "2024-01-29T11:30:00Z",
+      {
+        id: "m3",
+        senderId: "user1",
+        senderName: "Dr. Aminata Traoré",
+        content: "Je vous conseille de vacciner contre Newcastle à 4 semaines.",
+        timestamp: new Date(Date.now() - 72000000).toISOString(),
         read: true,
+        delivered: true,
         type: "text",
       },
-      unreadCount: 0,
-      pinned: false,
-      archived: false,
-      isGroup: true,
-      groupName: "Groupe Aviculture BF",
-    },
-  ]
+    ],
+  })
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "msg1",
-      senderId: "user1",
-      senderName: "Dr. Moussa Koné",
-      content: "Bonjour ! J'ai vu votre demande de consultation vétérinaire.",
-      timestamp: "2024-02-01T10:00:00Z",
-      read: true,
-      type: "text",
-    },
-    {
-      id: "msg2",
-      senderId: "current",
-      senderName: "Vous",
-      content: "Bonjour Docteur, oui j'ai quelques poules qui semblent malades depuis hier.",
-      timestamp: "2024-02-01T10:05:00Z",
-      read: true,
-      type: "text",
-    },
-    {
-      id: "msg3",
-      senderId: "user1",
-      senderName: "Dr. Moussa Koné",
-      content: "Pouvez-vous me décrire les symptômes que vous observez ?",
-      timestamp: "2024-02-01T10:10:00Z",
-      read: true,
-      type: "text",
-    },
-    {
-      id: "msg4",
-      senderId: "current",
-      senderName: "Vous",
-      content: "Elles ont l'air léthargiques, mangent moins et j'ai remarqué des éternuements.",
-      timestamp: "2024-02-01T10:15:00Z",
-      read: true,
-      type: "text",
-    },
-    {
-      id: "msg5",
-      senderId: "user1",
-      senderName: "Dr. Moussa Koné",
-      content:
-        "Cela ressemble à une infection respiratoire. Je peux vous aider avec un traitement approprié. Le coût de la consultation sera de 0.008π.",
-      timestamp: "2024-02-01T10:30:00Z",
-      read: false,
-      type: "text",
-    },
-  ])
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const suggestedUsers = [
-    {
-      id: "suggest1",
-      name: "Prof. Alassane Zoungrana",
-      specialty: "Formation aviculture",
-      rating: 4.9,
-      avatar: "/placeholder.svg?height=40&width=40&text=AZ",
-      mutual: 12,
-      location: "Ouagadougou, Burkina Faso",
-    },
-    {
-      id: "suggest2",
-      name: "TechAgri Solutions",
-      specialty: "Support technique",
-      rating: 4.8,
-      avatar: "/placeholder.svg?height=40&width=40&text=TS",
-      mutual: 8,
-      location: "Koudougou, Burkina Faso",
-    },
-    {
-      id: "suggest3",
-      name: "Fatou Kaboré",
-      specialty: "Éleveuse experte",
-      rating: 4.7,
-      avatar: "/placeholder.svg?height=40&width=40&text=FK",
-      mutual: 15,
-      location: "Banfora, Burkina Faso",
-    },
-    {
-      id: "suggest4",
-      name: "Coopérative YELEN",
-      specialty: "Formation et support",
-      rating: 4.6,
-      avatar: "/placeholder.svg?height=40&width=40&text=CY",
-      mutual: 20,
-      location: "Gaoua, Burkina Faso",
-    },
-  ]
+  const t = translations[currentLanguage as keyof typeof translations] || translations.fr
 
-  const handleSendMessage = () => {
-    if (!newMessage.trim() || !activeConversation) return
-
-    const message: Message = {
-      id: `msg${Date.now()}`,
-      senderId: "current",
-      senderName: "Vous",
-      content: newMessage,
-      timestamp: new Date().toISOString(),
-      read: true,
-      type: "text",
+  // Détection mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+      if (window.innerWidth < 768 && activeConversation) {
+        setShowSidebar(false)
+      } else if (window.innerWidth >= 768) {
+        setShowSidebar(true)
+      }
     }
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+    return () => window.removeEventListener("resize", checkMobile)
+  }, [activeConversation])
 
-    setMessages([...messages, message])
-    setNewMessage("")
+  // Scroll automatique vers le dernier message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages, activeConversation])
+
+  const sendMessage = useCallback(async (content: string, type: string = "text", replyTo?: Message) => {
+    if (!activeConversation || !content.trim() || !isOnline) return
+
+    setIsSending(true)
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300))
+
+      const newMsg: Message = {
+        id: Date.now().toString(),
+        senderId: "current",
+        senderName: userData?.username || "Vous",
+        content,
+        timestamp: new Date().toISOString(),
+        read: true,
+        delivered: true,
+        type: type as any,
+        amount: type === "payment" ? parseFloat(content) : undefined,
+        replyTo,
+      }
+
+      setMessages(prev => ({
+        ...prev,
+        [activeConversation]: [...(prev[activeConversation] || []), newMsg],
+      }))
+
+      // Mettre à jour le dernier message de la conversation
+      setConversations(prev => prev.map(conv =>
+        conv.id === activeConversation
+          ? { ...conv, lastMessage: newMsg, unreadCount: 0 }
+          : conv
+      ))
+
+      setNewMessage("")
+      setReplyToMessage(null)
+    } catch (error) {
+      showToast("Erreur lors de l'envoi", "error")
+    } finally {
+      setIsSending(false)
+    }
+  }, [activeConversation, isOnline, userData, setMessages, setConversations])
+
+  const sendPayment = useCallback(async () => {
+    if (!paymentAmount || !activeConversation) return
+
+    const amount = parseFloat(paymentAmount)
+    await sendMessage(`Paiement de ${amount} π`, "payment")
+    setShowPaymentModal(false)
+    setPaymentAmount("")
+    showToast("Paiement envoyé avec succès", "success")
+  }, [paymentAmount, activeConversation, sendMessage])
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    showToast(t.copied, "success")
   }
 
-  const formatTime = (timestamp: string) => {
+  const formatMessageTime = (timestamp: string) => {
     const date = new Date(timestamp)
     const now = new Date()
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+    const diff = now.getTime() - date.getTime()
+    const hours = Math.floor(diff / 3600000)
 
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    } else {
-      return date.toLocaleDateString()
-    }
+    if (hours < 1) return "à l'instant"
+    if (hours < 24) return `il y a ${hours}h`
+    if (hours < 48) return t.yesterday
+    return date.toLocaleDateString([], { day: "2-digit", month: "2-digit" })
   }
 
-  const filteredConversations = conversations.filter((conv) =>
-    conv.participants.some((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase())),
-  )
+  const handleSelectConversation = (convId: string) => {
+    setActiveConversation(convId)
+    if (isMobile) setShowSidebar(false)
+    // Marquer comme lu
+    setConversations(prev => prev.map(conv =>
+      conv.id === convId ? { ...conv, unreadCount: 0 } : conv
+    ))
+  }
+
+  const handleBackToList = () => {
+    setShowSidebar(true)
+    setActiveConversation(null)
+  }
+
+  const getParticipant = (conv: Conversation) => conv.participants[0]
+  const currentMessages = activeConversation ? (messages[activeConversation] || []) : []
+  const currentConv = conversations.find(c => c.id === activeConversation)
 
   return (
-    <div className="h-[700px] flex bg-white rounded-lg border overflow-hidden">
-      {/* Sidebar */}
-      <div className="w-1/3 border-r flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Messages</h2>
-            <div className="flex space-x-2">
-              <Button size="sm" variant="ghost">
-                <UserPlus className="h-4 w-4" />
-              </Button>
-              <Button size="sm" variant="ghost">
-                <Settings className="h-4 w-4" />
-              </Button>
+    <div className="h-[600px] md:h-[700px] flex bg-white rounded-xl border shadow-lg overflow-hidden relative">
+      {/* Sidebar - Liste des conversations */}
+      {(showSidebar || !isMobile) && (
+        <div className={`${isMobile ? 'absolute inset-0 z-10 bg-white' : 'w-80'} border-r flex flex-col`}>
+          <div className="p-4 border-b">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-green-600" />
+              {t.messages}
+            </h2>
+            <div className="relative mt-3">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder={t.search}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
             </div>
           </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Rechercher des conversations..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </div>
 
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <TabsList className="grid w-full grid-cols-3 mx-4 mt-2">
-            <TabsTrigger value="messages" className="text-xs">
-              Messages
-            </TabsTrigger>
-            <TabsTrigger value="discover" className="text-xs">
-              Découvrir
-            </TabsTrigger>
-            <TabsTrigger value="groups" className="text-xs">
-              Groupes
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex-1 overflow-y-auto">
+            {conversations.filter(conv => !conv.archived).length === 0 ? (
+              <div className="text-center py-12 text-gray-400">
+                <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">{t.noConversations}</p>
+              </div>
+            ) : (
+              conversations.filter(conv => !conv.archived).map((conv) => {
+                const participant = getParticipant(conv)
+                const name = conv.isGroup ? conv.groupName : participant?.name
+                const avatar = conv.isGroup ? conv.groupAvatar : participant?.avatar
+                const isOnline_status = !conv.isGroup && participant?.online
 
-          <TabsContent value="messages" className="flex-1 overflow-y-auto">
-            <div className="space-y-1 p-2">
-              {filteredConversations.map((conv) => (
-                <div
-                  key={conv.id}
-                  className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                    activeConversation === conv.id ? "bg-blue-50 border-blue-200" : "hover:bg-gray-50"
-                  }`}
-                  onClick={() => setActiveConversation(conv.id)}
-                >
-                  <div className="flex items-center space-x-3">
+                return (
+                  <div
+                    key={conv.id}
+                    className={`flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-all ${
+                      activeConversation === conv.id ? "bg-green-50 border-r-2 border-green-500" : ""
+                    }`}
+                    onClick={() => handleSelectConversation(conv.id)}
+                  >
                     <div className="relative">
-                      <img
-                        src={conv.participants[0].avatar || "/placeholder.svg"}
-                        alt={conv.participants[0].name}
-                        className="w-10 h-10 rounded-full"
-                      />
-                      {conv.participants[0].online && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                      )}
-                      {conv.isGroup && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-                          <Users className="h-2 w-2 text-white" />
-                        </div>
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="bg-gray-100 text-gray-600 text-lg">
+                          {avatar?.substring(0, 2) || "👤"}
+                        </AvatarFallback>
+                      </Avatar>
+                      {isOnline_status && (
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium truncate">
-                          {conv.isGroup ? conv.groupName : conv.participants[0].name}
-                        </p>
-                        <div className="flex items-center space-x-1">
-                          {conv.pinned && <Star className="h-3 w-3 text-yellow-500 fill-current" />}
-                          <span className="text-xs text-gray-500">{formatTime(conv.lastMessage.timestamp)}</span>
-                        </div>
+                        <p className="font-medium truncate">{name}</p>
+                        <span className="text-[10px] text-gray-400 flex-shrink-0 ml-2">
+                          {formatMessageTime(conv.lastMessage.timestamp)}
+                        </span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-gray-600 truncate">
-                          {conv.lastMessage.senderId === "current" ? "Vous: " : ""}
-                          {conv.lastMessage.content}
+                      <div className="flex items-center justify-between mt-0.5">
+                        <p className="text-xs text-gray-500 truncate flex-1">
+                          {conv.lastMessage.senderId === "current" && "Vous: "}
+                          {conv.lastMessage.type === "payment" ? "💰 Paiement" : conv.lastMessage.content}
                         </p>
                         {conv.unreadCount > 0 && (
-                          <Badge
-                            variant="default"
-                            className="text-xs h-5 w-5 rounded-full p-0 flex items-center justify-center"
-                          >
+                          <Badge className="bg-green-500 text-white ml-2 flex-shrink-0 text-[10px] px-1.5">
                             {conv.unreadCount}
                           </Badge>
                         )}
                       </div>
-                      {!conv.isGroup && conv.participants[0].location && (
-                        <div className="flex items-center text-xs text-gray-500 mt-1">
-                          <MapPin className="h-3 w-3 mr-1" />
-                          <span>{conv.participants[0].location}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
 
-          <TabsContent value="discover" className="flex-1 overflow-y-auto">
-            <div className="p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium text-sm">Utilisateurs suggérés</h3>
-                <Button variant="ghost" size="sm">
-                  <Filter className="h-3 w-3 mr-1" />
-                  Filtrer
-                </Button>
-              </div>
-              {suggestedUsers.map((user) => (
-                <div key={user.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                  <img src={user.avatar || "/placeholder.svg"} alt={user.name} className="w-10 h-10 rounded-full" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{user.name}</p>
-                    <p className="text-xs text-gray-600">{user.specialty}</p>
-                    <div className="flex items-center space-x-2 text-xs text-gray-500">
-                      <div className="flex items-center">
-                        <Star className="h-3 w-3 text-yellow-400 fill-current mr-1" />
-                        <span>{user.rating}</span>
-                      </div>
-                      <span>•</span>
-                      <span>{user.mutual} connexions communes</span>
-                    </div>
-                    <div className="flex items-center text-xs text-gray-500 mt-1">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      <span>{user.location}</span>
-                    </div>
-                  </div>
-                  <Button size="sm" variant="outline">
-                    <MessageSquare className="h-3 w-3 mr-1" />
-                    Message
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="groups" className="flex-1 overflow-y-auto">
-            <div className="p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium text-sm">Groupes disponibles</h3>
-                <Button size="sm" variant="outline">
-                  <UserPlus className="h-3 w-3 mr-1" />
-                  Créer
-                </Button>
-              </div>
-              {[
-                {
-                  name: "Aviculture Burkina Faso",
-                  members: 234,
-                  description: "Groupe pour les éleveurs de volailles du Burkina Faso",
-                  avatar: "🐔",
-                },
-                {
-                  name: "Agriculture Sahel",
-                  members: 156,
-                  description: "Communauté des agriculteurs de la région sahélienne",
-                  avatar: "🌾",
-                },
-                {
-                  name: "Transformation Agricole",
-                  members: 89,
-                  description: "Échanges sur la transformation des produits agricoles",
-                  avatar: "🏭",
-                },
-              ].map((group, index) => (
-                <div key={index} className="p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <span className="text-lg">{group.avatar}</span>
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{group.name}</p>
-                      <p className="text-xs text-gray-600">{group.members} membres</p>
-                    </div>
-                    <Button size="sm">Rejoindre</Button>
-                  </div>
-                  <p className="text-xs text-gray-600 ml-13">{group.description}</p>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {activeConversation ? (
+      {/* Zone de chat */}
+      <div className="flex-1 flex flex-col bg-white">
+        {activeConversation && currentConv ? (
           <>
-            {/* Chat Header */}
-            <div className="p-4 border-b flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="relative">
-                  <img
-                    src={
-                      conversations.find((c) => c.id === activeConversation)?.participants[0].avatar ||
-                      "/placeholder.svg" ||
-                      "/placeholder.svg"
-                    }
-                    alt="Avatar"
-                    className="w-10 h-10 rounded-full"
-                  />
-                  {conversations.find((c) => c.id === activeConversation)?.participants[0].online && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                  )}
-                </div>
+            {/* Header du chat */}
+            <div className="p-3 border-b flex items-center justify-between bg-white">
+              <div className="flex items-center gap-3">
+                {isMobile && (
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={handleBackToList}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                )}
+                <Avatar className="h-10 w-10">
+                  <AvatarFallback className="bg-gray-100">
+                    {currentConv.isGroup ? "👥" : getParticipant(currentConv)?.avatar?.substring(0, 2) || "👤"}
+                  </AvatarFallback>
+                </Avatar>
                 <div>
-                  <p className="font-medium">
-                    {conversations.find((c) => c.id === activeConversation)?.isGroup
-                      ? conversations.find((c) => c.id === activeConversation)?.groupName
-                      : conversations.find((c) => c.id === activeConversation)?.participants[0].name}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {conversations.find((c) => c.id === activeConversation)?.participants[0].online
-                      ? "En ligne"
-                      : `Vu ${formatTime(conversations.find((c) => c.id === activeConversation)?.participants[0].lastSeen || "")}`}
-                  </p>
+                  <h3 className="font-semibold text-sm">
+                    {currentConv.isGroup ? currentConv.groupName : getParticipant(currentConv)?.name}
+                  </h3>
+                  <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                    {currentConv.isGroup ? (
+                      <span>{currentConv.groupMembers} membres</span>
+                    ) : (
+                      <>
+                        {getParticipant(currentConv)?.online ? (
+                          <span className="text-green-600">{t.online}</span>
+                        ) : (
+                          <span>{t.offline}</span>
+                        )}
+                        {getParticipant(currentConv)?.location && (
+                          <>
+                            <span>•</span>
+                            <span>{getParticipant(currentConv)?.location}</span>
+                          </>
+                        )}
+                      </>
+                    )}
+                    {getParticipant(currentConv)?.rating && (
+                      <>
+                        <span>•</span>
+                        <span className="flex items-center gap-0.5">
+                          <Star className="h-2.5 w-2.5 text-yellow-500 fill-current" />
+                          {getParticipant(currentConv)?.rating}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <Button size="sm" variant="ghost">
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
                   <Phone className="h-4 w-4" />
                 </Button>
-                <Button size="sm" variant="ghost">
-                  <Video className="h-4 w-4" />
-                </Button>
-                <Button size="sm" variant="ghost">
-                  <Bell className="h-4 w-4" />
-                </Button>
-                <Button size="sm" variant="ghost">
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.senderId === "current" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                      message.senderId === "current" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
-                    }`}
-                  >
-                    {message.type === "text" && <p className="text-sm">{message.content}</p>}
-                    {message.type === "image" && (
-                      <div>
-                        <img
-                          src={message.fileUrl || "/placeholder.svg"}
-                          alt="Image"
-                          className="rounded mb-2 max-w-full"
-                        />
-                        {message.content && <p className="text-sm">{message.content}</p>}
-                      </div>
-                    )}
-                    {message.type === "file" && (
-                      <div className="flex items-center space-x-2">
-                        <File className="h-4 w-4" />
-                        <span className="text-sm">{message.fileName}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between mt-1">
-                      <span className={`text-xs ${message.senderId === "current" ? "text-blue-100" : "text-gray-500"}`}>
-                        {formatTime(message.timestamp)}
-                      </span>
-                      {message.senderId === "current" && (
-                        <div className="ml-2">
-                          {message.read ? (
-                            <CheckCircle2 className="h-3 w-3 text-blue-100" />
-                          ) : (
-                            <Circle className="h-3 w-3 text-blue-100" />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+              {currentMessages.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">{t.noMessages}</p>
                 </div>
-              ))}
+              ) : (
+                currentMessages.map((message, idx) => {
+                  const isCurrentUser = message.senderId === "current"
+                  const showAvatar = !isCurrentUser && (idx === 0 || currentMessages[idx-1]?.senderId !== message.senderId)
+
+                  return (
+                    <div key={message.id} className={`flex ${isCurrentUser ? "justify-end" : "justify-start"} group`}>
+                      <div className="flex items-end gap-2 max-w-[80%]">
+                        {!isCurrentUser && showAvatar && (
+                          <Avatar className="h-8 w-8 flex-shrink-0">
+                            <AvatarFallback className="bg-gray-200 text-xs">
+                              {getParticipant(currentConv)?.avatar?.substring(0, 2) || "👤"}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                        {!isCurrentUser && !showAvatar && <div className="w-8 flex-shrink-0" />}
+
+                        <div className="relative">
+                          <div className={`px-3 py-2 rounded-2xl ${
+                            isCurrentUser ? "bg-green-600 text-white" : "bg-white text-gray-900 shadow-sm"
+                          }`}>
+                            {message.replyTo && (
+                              <div className={`text-[10px] p-1.5 rounded mb-1 ${
+                                isCurrentUser ? "bg-green-700" : "bg-gray-100"
+                              }`}>
+                                <p className="font-medium">↳ {message.replyTo.senderName}</p>
+                                <p className="truncate">{message.replyTo.content.substring(0, 50)}</p>
+                              </div>
+                            )}
+                            {message.type === "text" && <p className="text-sm">{message.content}</p>}
+                            {message.type === "payment" && (
+                              <div className={`flex items-center gap-2 p-2 rounded-lg ${
+                                isCurrentUser ? "bg-green-700" : "bg-gray-50 border"
+                              }`}>
+                                <Pi className="h-5 w-5 text-purple-500" />
+                                <div>
+                                  <p className="text-sm font-medium">{message.amount} π</p>
+                                  <p className="text-[10px] opacity-75">Paiement</p>
+                                </div>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-end gap-1 mt-1">
+                              <span className={`text-[9px] ${isCurrentUser ? "text-green-200" : "text-gray-400"}`}>
+                                {formatMessageTime(message.timestamp)}
+                              </span>
+                              {isCurrentUser && message.delivered && (
+                                <CheckCircle2 className="h-2.5 w-2.5 text-green-200" />
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Actions au survol */}
+                          <div className={`absolute top-0 ${isCurrentUser ? "-left-7" : "-right-7"} opacity-0 group-hover:opacity-100 transition-opacity flex gap-1`}>
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 bg-white shadow-sm rounded-full" onClick={() => setReplyToMessage(message)}>
+                              <Reply className="h-3 w-3" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 bg-white shadow-sm rounded-full" onClick={() => copyToClipboard(message.content)}>
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+              <div ref={messagesEndRef} />
             </div>
 
-            {/* Message Input */}
-            <div className="p-4 border-t">
-              <div className="flex items-center space-x-2">
-                <Button size="sm" variant="ghost">
+            {/* Zone de saisie */}
+            <div className="p-3 border-t bg-white">
+              {replyToMessage && (
+                <div className="bg-gray-100 rounded-lg p-2 mb-2 flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-500">Réponse à {replyToMessage.senderName}</p>
+                    <p className="text-xs truncate">{replyToMessage.content}</p>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => setReplyToMessage(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-full" onClick={() => fileInputRef.current?.click()}>
                   <Paperclip className="h-4 w-4" />
-                </Button>
-                <Button size="sm" variant="ghost">
-                  <ImageIcon className="h-4 w-4" />
-                </Button>
-                <Button size="sm" variant="ghost">
-                  <Mic className="h-4 w-4" />
                 </Button>
                 <div className="flex-1 relative">
                   <Input
-                    placeholder="Tapez votre message..."
+                    placeholder={t.typeMessage}
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+                    onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && sendMessage(newMessage, "text")}
+                    className="pr-20 rounded-full text-sm"
+                    disabled={!isOnline}
                   />
-                  <Button size="sm" variant="ghost" className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                    <Smile className="h-4 w-4" />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 px-2 text-xs rounded-full"
+                    onClick={() => setShowPaymentModal(true)}
+                    disabled={!isOnline}
+                  >
+                    <Pi className="h-3 w-3 mr-1" />π
                   </Button>
                 </div>
-                <Button size="sm" onClick={handleSendMessage} disabled={!newMessage.trim()}>
-                  <Send className="h-4 w-4" />
+                <Button
+                  size="sm"
+                  onClick={() => sendMessage(newMessage, "text")}
+                  disabled={!newMessage.trim() || !isOnline || isSending}
+                  className="bg-green-600 hover:bg-green-700 rounded-full h-8 w-8 p-0"
+                >
+                  {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
+              {!isOnline && (
+                <p className="text-xs text-red-500 mt-2 text-center">⚠️ Vous êtes hors ligne</p>
+              )}
+              <input type="file" ref={fileInputRef} className="hidden" />
             </div>
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-gray-500">
-            <div className="text-center">
-              <MessageSquare className="h-12 w-12 mx-auto mb-4" />
-              <p className="text-lg font-medium">Sélectionnez une conversation</p>
-              <p className="text-sm">Choisissez une conversation pour commencer à discuter</p>
-              <Button className="mt-4" onClick={() => setActiveTab("discover")}>
-                Découvrir des utilisateurs
-              </Button>
+            <div className="text-center p-4">
+              <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+              <p className="text-lg font-medium">{t.selectConversation}</p>
+              <p className="text-sm text-gray-400">{t.selectConversationDesc}</p>
             </div>
           </div>
         )}
       </div>
+
+      {/* Modal paiement Pi */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-purple-600" />
+                {t.paymentRequest}
+              </h3>
+              <button onClick={() => setShowPaymentModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-gray-600 mb-4">
+              Envoyer à: <span className="font-medium">{getParticipant(currentConv!)?.name}</span>
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">{t.amount} (π)</label>
+              <Input
+                type="number"
+                step="0.001"
+                placeholder="0.008"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                className="text-lg"
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowPaymentModal(false)}>
+                {t.cancel}
+              </Button>
+              <Button className="flex-1 bg-purple-600 hover:bg-purple-700 gap-2" onClick={sendPayment} disabled={!paymentAmount}>
+                <Pi className="h-4 w-4" />
+                {t.pay}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
