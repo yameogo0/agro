@@ -36,7 +36,7 @@ import { useOnlineStatus } from "@/hooks/use-online-status"
 import { usePiAuth } from "@/contexts/pi-auth-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { showToast } from "@/lib/utils"
-import { createPiPayment, isPiSDKAvailable } from "@/lib/pi-payment"
+import { createPiPayment, isPiSDKAvailable } from "@/lib/pi-payments"
 
 interface ServiceManagementProps {
   currentLanguage: string
