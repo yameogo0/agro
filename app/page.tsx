@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Switch } from "@/components/ui/switch"
 import {
   Home,
   MessageSquare,
@@ -38,6 +39,7 @@ import {
   ChevronRight,
   Flower2,
   Sun,
+  Moon,
   Cloud,
   Droplets,
   Wind,
@@ -57,6 +59,7 @@ import GeolocationManager from "@/components/geolocation-manager"
 import { LanguageSelector } from "@/components/LanguageSelector"
 import { usePiAuth } from "@/contexts/pi-auth-context"
 import { useOnlineStatus } from "@/hooks/use-online-status"
+import { useLocalStorage } from "@/hooks/use-local-storage"
 import { showToast } from "@/lib/utils"
 
 // Composant UserIcon pour les statistiques
@@ -80,6 +83,11 @@ export default function AgroMulticenterApp() {
   const [greeting, setGreeting] = useState("")
   const [notificationCount] = useState(3)
   const [unreadMessages] = useState(2)
+
+  // Paramètres utilisateur avec persistance localStorage
+  const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage("notificationsEnabled", true)
+  const [darkMode, setDarkMode] = useLocalStorage("darkMode", false)
+  const [autoSync, setAutoSync] = useLocalStorage("autoSync", true)
 
   const [registrationData, setRegistrationData] = useState({
     firstName: "",
@@ -106,6 +114,15 @@ export default function AgroMulticenterApp() {
     else setGreeting("Bonsoir")
     return () => clearInterval(timer)
   }, [])
+
+  // Appliquer le mode sombre
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark")
+    } else {
+      document.documentElement.classList.remove("dark")
+    }
+  }, [darkMode])
 
   const worldCountries = [
     { name: "Burkina Faso", code: "BF", flag: "🇧🇫", continent: "Africa" },
@@ -312,220 +329,250 @@ export default function AgroMulticenterApp() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
-      {/* Mobile Header */}
-      <div className="lg:hidden sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b px-4 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 bg-gradient-to-r from-green-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
-            <span className="text-white text-sm">🌾</span>
-          </div>
-          <div>
-            <h1 className="font-bold text-green-800 text-sm">AGRO MC</h1>
-            <p className="text-[9px] text-gray-400">HINOS</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {!isOnline && <WifiOff className="h-4 w-4 text-yellow-500" />}
-          <div className="flex items-center gap-1 text-[10px] text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-            <Clock className="h-3 w-3" />
-            {formatTime(currentTime)}
-          </div>
-          {unreadMessages > 0 && (
-            <div className="relative">
-              <MessageSquare className="h-4 w-4 text-gray-500" />
-              <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full text-[7px] text-white flex items-center justify-center">
-                {unreadMessages}
-              </span>
+    <div className={`min-h-screen ${darkMode ? "dark" : ""}`}>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+        {/* Mobile Header */}
+        <div className="lg:hidden sticky top-0 z-30 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b dark:border-gray-700 px-4 py-3 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 bg-gradient-to-r from-green-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+              <span className="text-white text-sm">🌾</span>
             </div>
-          )}
-          <LanguageSelector 
-            currentLanguage={currentLanguage} 
-            onLanguageChange={setCurrentLanguage} 
-            variant="minimal"
-          />
-          <Button variant="ghost" size="sm" onClick={() => setIsMenuOpen(!isMenuOpen)} className="h-8 w-8 p-0 rounded-full hover:bg-gray-100">
-            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex">
-        {/* Sidebar */}
-        <div className={`${isMenuOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-40 w-72 bg-white border-r shadow-xl transition-transform duration-300 flex flex-col h-full`}>
-          {/* Sidebar Header */}
-          <div className="p-6 border-b bg-gradient-to-r from-green-50 to-blue-50">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
-                <span className="text-white text-2xl">🌾</span>
-              </div>
-              <div>
-                <h1 className="font-bold text-green-800 text-lg">AGRO MULTICENTER</h1>
-                <p className="text-xs text-gray-500">HINOS</p>
-              </div>
-            </div>
-            <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-green-100 text-green-700 text-sm font-semibold">
-                    {userData?.username?.charAt(0).toUpperCase() || "A"}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="text-sm font-medium text-gray-800">{userData?.username?.split(" ")[0] || "Agriculteur"}</p>
-                  <p className="text-[10px] text-gray-400">Membre</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 text-[10px] text-gray-400 bg-white px-2 py-1 rounded-full shadow-sm">
-                <Leaf className="h-3 w-3 text-green-500" />
-                <span>Bio</span>
-              </div>
+            <div>
+              <h1 className="font-bold text-green-800 dark:text-green-400 text-sm">AGRO MC</h1>
+              <p className="text-[9px] text-gray-400">HINOS</p>
             </div>
           </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            {navigationItems.map((item) => {
-              const Icon = item.icon
-              const isActive = activeTab === item.id
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => { setActiveTab(item.id); setIsMenuOpen(false) }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
-                    isActive 
-                      ? "bg-gradient-to-r from-green-50 to-blue-50 text-green-700 shadow-sm" 
-                      : "hover:bg-gray-50 text-gray-600 hover:text-gray-900"
-                  }`}
-                >
-                  <div className={`p-1.5 rounded-lg transition-all ${isActive ? item.bg : "bg-gray-100 group-hover:bg-gray-200"}`}>
-                    <Icon className={`h-4 w-4 ${isActive ? item.color : "text-gray-500"}`} />
-                  </div>
-                  <span className={`text-sm font-medium flex-1 text-left ${isActive ? "text-green-700" : ""}`}>{item.label}</span>
-                  {isActive && <div className="w-1.5 h-1.5 rounded-full bg-green-500" />}
-                </button>
-              )
-            })}
-          </nav>
-
-          {/* Sidebar Footer */}
-          <div className="p-4 border-t">
-            <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-4 rounded-xl shadow-lg relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10" />
-              <div className="relative z-10">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] text-green-100">📍 Position actuelle</p>
-                    <p className="text-sm font-semibold flex items-center gap-1">{userRegion} <MapPin className="h-3 w-3" /></p>
-                  </div>
-                  <div className="flex items-center gap-1 text-[10px] text-green-100">
-                    {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-                    {isOnline ? "En ligne" : "Hors ligne"}
-                  </div>
-                </div>
-                <div className="mt-2 flex items-center gap-2 text-[10px] text-green-100">
-                  <Sun className="h-3 w-3" />
-                  <span>32°C • Ensoleillé</span>
-                </div>
-              </div>
+          <div className="flex items-center gap-2">
+            {!isOnline && <WifiOff className="h-4 w-4 text-yellow-500" />}
+            <div className="flex items-center gap-1 text-[10px] text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
+              <Clock className="h-3 w-3" />
+              {formatTime(currentTime)}
             </div>
+            {unreadMessages > 0 && (
+              <div className="relative">
+                <MessageSquare className="h-4 w-4 text-gray-500" />
+                <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full text-[7px] text-white flex items-center justify-center">
+                  {unreadMessages}
+                </span>
+              </div>
+            )}
+            <LanguageSelector 
+              currentLanguage={currentLanguage} 
+              onLanguageChange={setCurrentLanguage} 
+              variant="minimal"
+            />
+            <Button variant="ghost" size="sm" onClick={() => setIsMenuOpen(!isMenuOpen)} className="h-8 w-8 p-0 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 lg:ml-0 pb-20 lg:pb-6 min-h-screen">
-          {/* Header Desktop */}
-          <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b hidden lg:block">
-            <div className="px-6 py-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-green-700 to-blue-700 bg-clip-text text-transparent">
-                  {navigationItems.find((item) => item.id === activeTab)?.label}
-                </h2>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  {greeting}, {userData?.username?.split(" ")[0] || "Agriculteur"} 👋
-                </p>
-              </div>
+        <div className="flex">
+          {/* Sidebar */}
+          <div className={`${isMenuOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-40 w-72 bg-white dark:bg-gray-900 border-r dark:border-gray-800 shadow-xl transition-transform duration-300 flex flex-col h-full`}>
+            {/* Sidebar Header */}
+            <div className="p-6 border-b bg-gradient-to-r from-green-50 to-blue-50 dark:from-gray-800 dark:to-gray-800">
               <div className="flex items-center gap-3">
-                {!isOnline && (
-                  <Badge variant="outline" className="text-yellow-600 border-yellow-300 gap-1">
-                    <WifiOff className="h-3 w-3" /> Hors ligne
-                  </Badge>
-                )}
-                <Button variant="outline" size="sm" className="gap-2 rounded-xl relative">
-                  <Bell className="h-4 w-4" />
-                  <span className="hidden sm:inline">Notifications</span>
-                  {notificationCount > 0 && (
-                    <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center">
-                      {notificationCount}
-                    </span>
-                  )}
-                </Button>
-                <div className="h-8 w-px bg-gray-200" />
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Clock className="h-4 w-4" />
-                  {formatTime(currentTime)}
+                <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+                  <span className="text-white text-2xl">🌾</span>
                 </div>
-                <LanguageSelector 
-                  currentLanguage={currentLanguage} 
-                  onLanguageChange={setCurrentLanguage} 
-                  variant="default"
-                />
+                <div>
+                  <h1 className="font-bold text-green-800 dark:text-green-400 text-lg">AGRO MULTICENTER</h1>
+                  <p className="text-xs text-gray-500">HINOS</p>
+                </div>
+              </div>
+              <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 text-sm font-semibold">
+                      {userData?.username?.charAt(0).toUpperCase() || "A"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{userData?.username?.split(" ")[0] || "Agriculteur"}</p>
+                    <p className="text-[10px] text-gray-400">Membre</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 text-[10px] text-gray-400 bg-white dark:bg-gray-800 px-2 py-1 rounded-full shadow-sm">
+                  <Leaf className="h-3 w-3 text-green-500" />
+                  <span>Bio</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+              {navigationItems.map((item) => {
+                const Icon = item.icon
+                const isActive = activeTab === item.id
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => { setActiveTab(item.id); setIsMenuOpen(false) }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
+                      isActive 
+                        ? "bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/30 dark:to-blue-900/30 text-green-700 dark:text-green-400 shadow-sm" 
+                        : "hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    <div className={`p-1.5 rounded-lg transition-all ${isActive ? item.bg : "bg-gray-100 dark:bg-gray-800 group-hover:bg-gray-200 dark:group-hover:bg-gray-700"}`}>
+                      <Icon className={`h-4 w-4 ${isActive ? item.color : "text-gray-500 dark:text-gray-500"}`} />
+                    </div>
+                    <span className={`text-sm font-medium flex-1 text-left ${isActive ? "text-green-700 dark:text-green-400" : ""}`}>{item.label}</span>
+                    {isActive && <div className="w-1.5 h-1.5 rounded-full bg-green-500" />}
+                  </button>
+                )
+              })}
+            </nav>
+
+            {/* Sidebar Footer */}
+            <div className="p-4 border-t dark:border-gray-800">
+              <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-4 rounded-xl shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10" />
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-green-100">📍 Position actuelle</p>
+                      <p className="text-sm font-semibold flex items-center gap-1">{userRegion} <MapPin className="h-3 w-3" /></p>
+                    </div>
+                    <div className="flex items-center gap-1 text-[10px] text-green-100">
+                      {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+                      {isOnline ? "En ligne" : "Hors ligne"}
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 text-[10px] text-green-100">
+                    <Sun className="h-3 w-3" />
+                    <span>32°C • Ensoleillé</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Tab Content */}
-          <div className="p-4 lg:p-6">
-            <div className="space-y-6">
-              {activeTab === "home" && <Dashboard currentLanguage={currentLanguage} userRegion={userRegion} onTabChange={setActiveTab} />}
-              {activeTab === "aviculture" && <AvicultureManagement currentLanguage={currentLanguage} userRegion={userRegion} />}
-              {activeTab === "services" && <ServiceManagement currentLanguage={currentLanguage} userRegion={userRegion} />}
-              {activeTab === "messages" && <MessagingSystem currentLanguage={currentLanguage} userRegion={userRegion} />}
-              {activeTab === "wallet" && <PiWalletIntegration currentLanguage={currentLanguage} userRegion={userRegion} />}
-              {activeTab === "profile" && <UserProfile currentLanguage={currentLanguage} userRegion={userRegion} />}
-              {activeTab === "regional" && <RegionalAdaptation currentLanguage={currentLanguage} userRegion={userRegion} onRegionChange={setUserRegion} />}
-              {activeTab === "geolocation" && <GeolocationManager currentLanguage={currentLanguage} userRegion={userRegion} />}
-              {activeTab === "settings" && (
-                <Card className="border-0 shadow-sm">
-                  <CardHeader className="border-b bg-gradient-to-r from-gray-50 to-white">
-                    <CardTitle className="flex items-center gap-2 text-xl">
-                      <Settings className="h-5 w-5 text-gray-600" />
-                      Paramètres
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4 p-6">
-                    <div className="flex justify-between items-center p-4 rounded-xl bg-gray-50">
-                      <div><h4 className="font-medium">Notifications push</h4><p className="text-sm text-gray-500">Recevoir les alertes et rappels</p></div>
-                      <Badge className="bg-green-100 text-green-700">Activé</Badge>
-                    </div>
-                    <div className="flex justify-between items-center p-4 rounded-xl bg-gray-50">
-                      <div><h4 className="font-medium">Mode sombre</h4><p className="text-sm text-gray-500">Adapter l'affichage à vos préférences</p></div>
-                      <Badge className="bg-gray-100 text-gray-700">Désactivé</Badge>
-                    </div>
-                    <div className="flex justify-between items-center p-4 rounded-xl bg-gray-50">
-                      <div><h4 className="font-medium">Synchronisation automatique</h4><p className="text-sm text-gray-500">Synchroniser vos données en arrière-plan</p></div>
-                      <Badge className="bg-green-100 text-green-700">Activé</Badge>
-                    </div>
-                    <div className="flex justify-between items-center p-4 rounded-xl bg-purple-50">
-                      <div><h4 className="font-medium">Paiements Pi Network</h4><p className="text-sm text-gray-500">Toutes les transactions en Pi</p></div>
-                      <Badge className="bg-purple-100 text-purple-700">Actif</Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+          {/* Main Content */}
+          <div className="flex-1 lg:ml-0 pb-20 lg:pb-6 min-h-screen">
+            {/* Header Desktop */}
+            <div className="sticky top-0 z-20 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b dark:border-gray-800 hidden lg:block">
+              <div className="px-6 py-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold bg-gradient-to-r from-green-700 to-blue-700 dark:from-green-400 dark:to-blue-400 bg-clip-text text-transparent">
+                    {navigationItems.find((item) => item.id === activeTab)?.label}
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                    {greeting}, {userData?.username?.split(" ")[0] || "Agriculteur"} 👋
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {!isOnline && (
+                    <Badge variant="outline" className="text-yellow-600 border-yellow-300 gap-1">
+                      <WifiOff className="h-3 w-3" /> Hors ligne
+                    </Badge>
+                  )}
+                  <Button variant="outline" size="sm" className="gap-2 rounded-xl relative">
+                    <Bell className="h-4 w-4" />
+                    <span className="hidden sm:inline">Notifications</span>
+                    {notificationCount > 0 && (
+                      <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center">
+                        {notificationCount}
+                      </span>
+                    )}
+                  </Button>
+                  <div className="h-8 w-px bg-gray-200 dark:bg-gray-700" />
+                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                    <Clock className="h-4 w-4" />
+                    {formatTime(currentTime)}
+                  </div>
+                  <LanguageSelector 
+                    currentLanguage={currentLanguage} 
+                    onLanguageChange={setCurrentLanguage} 
+                    variant="default"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Tab Content */}
+            <div className="p-4 lg:p-6">
+              <div className="space-y-6">
+                {activeTab === "home" && <Dashboard currentLanguage={currentLanguage} userRegion={userRegion} onTabChange={setActiveTab} />}
+                {activeTab === "aviculture" && <AvicultureManagement currentLanguage={currentLanguage} userRegion={userRegion} />}
+                {activeTab === "services" && <ServiceManagement currentLanguage={currentLanguage} userRegion={userRegion} />}
+                {activeTab === "messages" && <MessagingSystem currentLanguage={currentLanguage} userRegion={userRegion} />}
+                {activeTab === "wallet" && <PiWalletIntegration currentLanguage={currentLanguage} userRegion={userRegion} />}
+                {activeTab === "profile" && <UserProfile currentLanguage={currentLanguage} userRegion={userRegion} />}
+                {activeTab === "regional" && <RegionalAdaptation currentLanguage={currentLanguage} userRegion={userRegion} onRegionChange={setUserRegion} />}
+                {activeTab === "geolocation" && <GeolocationManager currentLanguage={currentLanguage} userRegion={userRegion} />}
+                {activeTab === "settings" && (
+                  <Card className="border-0 shadow-sm dark:bg-gray-900">
+                    <CardHeader className="border-b bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900">
+                      <CardTitle className="flex items-center gap-2 text-xl dark:text-gray-100">
+                        <Settings className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                        Paramètres
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4 p-6">
+                      {/* Notifications push */}
+                      <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-800">
+                        <div>
+                          <h4 className="font-medium dark:text-gray-200">Notifications push</h4>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">Recevoir les alertes et rappels</p>
+                        </div>
+                        <Switch
+                          checked={notificationsEnabled}
+                          onCheckedChange={setNotificationsEnabled}
+                        />
+                      </div>
+
+                      {/* Mode sombre */}
+                      <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-800">
+                        <div>
+                          <h4 className="font-medium dark:text-gray-200">Mode sombre</h4>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">Adapter l'affichage à vos préférences</p>
+                        </div>
+                        <Switch
+                          checked={darkMode}
+                          onCheckedChange={setDarkMode}
+                        />
+                      </div>
+
+                      {/* Synchronisation automatique */}
+                      <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-gray-800">
+                        <div>
+                          <h4 className="font-medium dark:text-gray-200">Synchronisation automatique</h4>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">Synchroniser vos données en arrière-plan</p>
+                        </div>
+                        <Switch
+                          checked={autoSync}
+                          onCheckedChange={setAutoSync}
+                        />
+                      </div>
+
+                      {/* Paiements Pi Network */}
+                      <div className="flex items-center justify-between p-4 rounded-xl bg-purple-50 dark:bg-purple-900/30">
+                        <div>
+                          <h4 className="font-medium dark:text-gray-200">Paiements Pi Network</h4>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">Toutes les transactions en Pi</p>
+                        </div>
+                        <Badge className="bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-300">Actif</Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Mobile Navigation */}
-      <MobileNavigation
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        onMenuToggle={() => setIsMenuOpen(!isMenuOpen)}
-        unreadCount={unreadMessages}
-        notificationCount={notificationCount}
-        currentLanguage={currentLanguage}
-      />
+        {/* Mobile Navigation */}
+        <MobileNavigation
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onMenuToggle={() => setIsMenuOpen(!isMenuOpen)}
+          unreadCount={unreadMessages}
+          notificationCount={notificationCount}
+          currentLanguage={currentLanguage}
+        />
+      </div>
     </div>
   )
 }
