@@ -56,14 +56,14 @@ import { initPiSDK } from "@/lib/pi-payments"
 export default function AgroMulticenterApp() {
   const { isAuthenticated, isLoading, login, userData, error } = usePiAuth()
   const isOnline = useOnlineStatus()
-  
+
   // ✅ Géolocalisation GPS réelle
   const { latitude, longitude, accuracy, loading: geoLoading, refresh: refreshGeo } = useGeolocation({
     enableHighAccuracy: true,
     timeout: 15000,
     maximumAge: 0,
   })
-  
+
   const [activeTab, setActiveTab] = useState("home")
   const [currentLanguage, setCurrentLanguage] = useState("fr")
   const [userRegion, setUserRegion] = useState("Burkina Faso")
@@ -76,10 +76,16 @@ export default function AgroMulticenterApp() {
   const [notificationCount] = useState(3)
   const [unreadMessages] = useState(2)
 
-  // Paramètres utilisateur
+  // Paramètres utilisateur avec persistance localStorage
   const [notificationsEnabled, setNotificationsEnabled] = useLocalStorage("notificationsEnabled", true)
   const [darkMode, setDarkMode] = useLocalStorage("darkMode", false)
   const [autoSync, setAutoSync] = useLocalStorage("autoSync", true)
+
+  const [registrationData, setRegistrationData] = useState({
+    firstName: "", lastName: "", email: "", phone: "", country: "", region: "", city: "",
+    profession: "", specialties: [] as string[], languages: [] as string[], piWalletAddress: "",
+    latitude: null as number | null, longitude: null as number | null,
+  })
 
   // ✅ Récupérer l'adresse réelle à partir des coordonnées GPS
   useEffect(() => {
@@ -109,7 +115,7 @@ export default function AgroMulticenterApp() {
     }
   }, [isAuthenticated])
 
-  // Mettre à jour l'heure
+  // Mettre à jour l'heure et le message de bienvenue
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000)
     const hour = new Date().getHours()
@@ -119,7 +125,7 @@ export default function AgroMulticenterApp() {
     return () => clearInterval(timer)
   }, [])
 
-  // Mode sombre
+  // Appliquer le mode sombre
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add("dark")
@@ -128,12 +134,6 @@ export default function AgroMulticenterApp() {
     }
   }, [darkMode])
 
-  const [registrationData, setRegistrationData] = useState({
-    firstName: "", lastName: "", email: "", phone: "", country: "", region: "", city: "",
-    profession: "", specialties: [] as string[], languages: [] as string[], piWalletAddress: "",
-    latitude: null as number | null, longitude: null as number | null,
-  })
-
   const worldCountries = [
     { name: "Burkina Faso", code: "BF", flag: "🇧🇫" }, { name: "Mali", code: "ML", flag: "🇲🇱" },
     { name: "Niger", code: "NE", flag: "🇳🇪" }, { name: "Sénégal", code: "SN", flag: "🇸🇳" },
@@ -141,8 +141,16 @@ export default function AgroMulticenterApp() {
     { name: "Nigeria", code: "NG", flag: "🇳🇬" }, { name: "France", code: "FR", flag: "🇫🇷" },
   ]
 
-  const professions = ["Agriculteur", "Éleveur", "Vétérinaire", "Agronome", "Transformateur agricole", "Commerçant agricole", "Consultant agricole", "Formateur", "Chercheur", "Coopérative", "ONG", "Autre"]
-  const specialties = ["Aviculture", "Bovins", "Ovins/Caprins", "Pisciculture", "Apiculture", "Maraîchage", "Céréales", "Légumineuses", "Fruits", "Transformation", "Marketing", "Finance agricole"]
+  const professions = [
+    "Agriculteur", "Éleveur", "Vétérinaire", "Agronome", "Transformateur agricole",
+    "Commerçant agricole", "Consultant agricole", "Formateur", "Chercheur", "Coopérative", "ONG", "Autre",
+  ]
+
+  const specialties = [
+    "Aviculture", "Bovins", "Ovins/Caprins", "Pisciculture", "Apiculture", "Maraîchage",
+    "Céréales", "Légumineuses", "Fruits", "Transformation", "Marketing", "Finance agricole",
+  ]
+
   const availableLanguages = ["Français", "English", "Português", "Dioula", "Mooré", "Haoussa"]
 
   const handleRegistration = async () => {
@@ -234,7 +242,7 @@ export default function AgroMulticenterApp() {
           </Card>
         </div>
 
-        {/* Dialog d'inscription - gardez votre code existant */}
+        {/* Dialog d'inscription */}
         <Dialog open={showRegistration} onOpenChange={(open) => { if (!open) setRegistrationSuccess(false); setShowRegistration(open) }}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -247,7 +255,14 @@ export default function AgroMulticenterApp() {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Formulaire d'inscription - gardez votre code existant */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div><Label>Prénom *</Label><Input placeholder="Prénom" value={registrationData.firstName} onChange={(e) => setRegistrationData({ ...registrationData, firstName: e.target.value })} /></div>
+                  <div><Label>Nom</Label><Input placeholder="Nom" value={registrationData.lastName} onChange={(e) => setRegistrationData({ ...registrationData, lastName: e.target.value })} /></div>
+                </div>
+                <div><Label>Email</Label><Input type="email" placeholder="email@exemple.com" value={registrationData.email} onChange={(e) => setRegistrationData({ ...registrationData, email: e.target.value })} /></div>
+                <div><Label>Téléphone</Label><Input placeholder="+226 XX XX XX XX" value={registrationData.phone} onChange={(e) => setRegistrationData({ ...registrationData, phone: e.target.value })} /></div>
+                <div><Label>Pays *</Label><Select value={registrationData.country} onValueChange={(value) => setRegistrationData({ ...registrationData, country: value })}><SelectTrigger><SelectValue placeholder="Sélectionnez" /></SelectTrigger><SelectContent>{worldCountries.map((c) => (<SelectItem key={c.code} value={c.name}><span>{c.flag} {c.name}</span></SelectItem>))}</SelectContent></Select></div>
+                <div><Label>Profession</Label><Select value={registrationData.profession} onValueChange={(value) => setRegistrationData({ ...registrationData, profession: value })}><SelectTrigger><SelectValue placeholder="Sélectionnez" /></SelectTrigger><SelectContent>{professions.map((p) => (<SelectItem key={p} value={p}>{p}</SelectItem>))}</SelectContent></Select></div>
                 <Button onClick={handleRegistration} className="w-full">Créer mon compte</Button>
               </div>
             )}
@@ -257,6 +272,7 @@ export default function AgroMulticenterApp() {
     )
   }
 
+  // Interface principale après authentification
   return (
     <div className={`min-h-screen ${darkMode ? "dark" : ""}`}>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
@@ -353,9 +369,7 @@ export default function AgroMulticenterApp() {
                   <p className="text-sm text-gray-500 mt-0.5">{greeting}, {userData?.username?.split(" ")[0] || "Agriculteur"} 👋</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <Clock className="h-4 w-4" />{formatTime(currentTime)}
-                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-500"><Clock className="h-4 w-4" />{formatTime(currentTime)}</div>
                   <LanguageSelector currentLanguage={currentLanguage} onLanguageChange={setCurrentLanguage} variant="default" />
                 </div>
               </div>
