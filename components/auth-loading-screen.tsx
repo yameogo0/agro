@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 
 interface AuthLoadingScreenProps {
   language?: string;
@@ -77,25 +78,19 @@ export function AuthLoadingScreen({ language = "fr", message }: AuthLoadingScree
 
         <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
           <div 
-            className="bg-gradient-to-r from-green-500 to-blue-600 h-2 rounded-full transition-all duration-300"
+            className="bg-gradient-to-r from-green-500 to-blue-600 h-2 rounded-full transition-all duration-300 relative overflow-hidden"
             style={{ width: `${progress}%` }}
           >
-            <div className="absolute inset-0 bg-white/20 animate-shimmer" />
+            <div className="absolute inset-0 bg-white/30 animate-[shimmer_1.5s_infinite]" />
           </div>
         </div>
 
-        <p className="text-xs text-gray-400 mt-6">Version 2.1.0 • Paiements Pi • Multilingue</p>
-      </div>
+        <div className="mt-4 flex justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-green-600" />
+        </div>
 
-      <style jsx>{`
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        .animate-shimmer {
-          animation: shimmer 1.5s infinite;
-        }
-      `}</style>
+        <p className="text-xs text-gray-400 mt-4">Version 2.1.0 • Paiements Pi • Multilingue</p>
+      </div>
     </div>
   );
 }
