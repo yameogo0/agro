@@ -71,6 +71,8 @@ export default function AgroMulticenterApp() {
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [greeting, setGreeting] = useState("")
+  const [notificationCount] = useState(3)
+  const [unreadMessages] = useState(2)
 
   const [registrationData, setRegistrationData] = useState({
     firstName: "",
@@ -321,8 +323,19 @@ export default function AgroMulticenterApp() {
             <Clock className="h-3 w-3" />
             {formatTime(currentTime)}
           </div>
-          {/* LanguageSelector compact sur mobile */}
-          <LanguageSelector currentLanguage={currentLanguage} onLanguageChange={setCurrentLanguage} />
+          {unreadMessages > 0 && (
+            <div className="relative">
+              <MessageSquare className="h-4 w-4 text-gray-500" />
+              <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full text-[7px] text-white flex items-center justify-center">
+                {unreadMessages}
+              </span>
+            </div>
+          )}
+          <LanguageSelector 
+            currentLanguage={currentLanguage} 
+            onLanguageChange={setCurrentLanguage} 
+            variant="minimal"
+          />
           <Button variant="ghost" size="sm" onClick={() => setIsMenuOpen(!isMenuOpen)} className="h-8 w-8 p-0 rounded-full hover:bg-gray-100">
             {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
@@ -430,17 +443,25 @@ export default function AgroMulticenterApp() {
                     <WifiOff className="h-3 w-3" /> Hors ligne
                   </Badge>
                 )}
-                <Button variant="outline" size="sm" className="gap-2 rounded-xl">
+                <Button variant="outline" size="sm" className="gap-2 rounded-xl relative">
                   <Bell className="h-4 w-4" />
                   <span className="hidden sm:inline">Notifications</span>
+                  {notificationCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center">
+                      {notificationCount}
+                    </span>
+                  )}
                 </Button>
                 <div className="h-8 w-px bg-gray-200" />
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Clock className="h-4 w-4" />
                   {formatTime(currentTime)}
                 </div>
-                {/* LanguageSelector compact sur desktop */}
-                <LanguageSelector currentLanguage={currentLanguage} onLanguageChange={setCurrentLanguage} />
+                <LanguageSelector 
+                  currentLanguage={currentLanguage} 
+                  onLanguageChange={setCurrentLanguage} 
+                  variant="default"
+                />
               </div>
             </div>
           </div>
