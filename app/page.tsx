@@ -59,6 +59,13 @@ import { usePiAuth } from "@/contexts/pi-auth-context"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { showToast } from "@/lib/utils"
 
+// Composant UserIcon pour les statistiques
+const UserIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+)
+
 export default function AgroMulticenterApp() {
   const { isAuthenticated, isLoading, login, userData, error } = usePiAuth()
   const isOnline = useOnlineStatus()
@@ -492,15 +499,15 @@ export default function AgroMulticenterApp() {
                     </div>
                     <div className="flex justify-between items-center p-4 rounded-xl bg-gray-50">
                       <div><h4 className="font-medium">Mode sombre</h4><p className="text-sm text-gray-500">Adapter l'affichage à vos préférences</p></div>
-                      <Badge variant="outline" className="text-gray-500">Désactivé</Badge>
+                      <Badge className="bg-gray-100 text-gray-700">Désactivé</Badge>
                     </div>
                     <div className="flex justify-between items-center p-4 rounded-xl bg-gray-50">
-                      <div><h4 className="font-medium">Paiements Pi</h4><p className="text-sm text-gray-500">Tous les prix sont en Pi Network</p></div>
-                      <Badge className="bg-purple-100 text-purple-700 gap-1"><Pi className="h-3 w-3" />Actif</Badge>
+                      <div><h4 className="font-medium">Synchronisation automatique</h4><p className="text-sm text-gray-500">Synchroniser vos données en arrière-plan</p></div>
+                      <Badge className="bg-green-100 text-green-700">Activé</Badge>
                     </div>
-                    <div className="flex justify-between items-center p-4 rounded-xl bg-gray-50">
-                      <div><h4 className="font-medium">Sauvegarde automatique</h4><p className="text-sm text-gray-500">Synchronisation des données</p></div>
-                      <Badge className="bg-green-100 text-green-700">Activée</Badge>
+                    <div className="flex justify-between items-center p-4 rounded-xl bg-purple-50">
+                      <div><h4 className="font-medium">Paiements Pi Network</h4><p className="text-sm text-gray-500">Toutes les transactions en Pi</p></div>
+                      <Badge className="bg-purple-100 text-purple-700">Actif</Badge>
                     </div>
                   </CardContent>
                 </Card>
@@ -510,7 +517,15 @@ export default function AgroMulticenterApp() {
         </div>
       </div>
 
-      <MobileNavigation activeTab={activeTab} onTabChange={setActiveTab} onMenuToggle={() => setIsMenuOpen(!isMenuOpen)} />
+      {/* Mobile Navigation */}
+      <MobileNavigation
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onMenuToggle={() => setIsMenuOpen(!isMenuOpen)}
+        unreadCount={unreadMessages}
+        notificationCount={notificationCount}
+        currentLanguage={currentLanguage}
+      />
     </div>
   )
 }
