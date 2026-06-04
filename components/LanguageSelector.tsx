@@ -8,10 +8,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
-import { Globe, Check, ChevronDown, Languages, Sparkles } from "lucide-react"
-import { useLocalStorage } from "@/hooks/use-local-storage"
+import { Globe, Check, ChevronDown } from "lucide-react"
 import { showToast } from "@/lib/utils"
 
 interface Language {
@@ -19,29 +17,22 @@ interface Language {
   name: string
   nativeName: string
   flag: string
-  direction?: "ltr" | "rtl"
 }
 
 const languages: Language[] = [
-  { code: "fr", name: "Français", nativeName: "Français", flag: "🇫🇷", direction: "ltr" },
-  { code: "en", name: "English", nativeName: "English", flag: "🇬🇧", direction: "ltr" },
-  { code: "pt", name: "Português", nativeName: "Português", flag: "🇵🇹", direction: "ltr" },
-  { code: "es", name: "Español", nativeName: "Español", flag: "🇪🇸", direction: "ltr" },
-  { code: "dyu", name: "Dioula", nativeName: "Jula", flag: "🇨🇮", direction: "ltr" },
-  { code: "mos", name: "Mooré", nativeName: "Mòoré", flag: "🇧🇫", direction: "ltr" },
-  { code: "ha", name: "Haoussa", nativeName: "Harshen Hausa", flag: "🇳🇬", direction: "ltr" },
+  { code: "fr", name: "Français", nativeName: "Français", flag: "🇫🇷" },
+  { code: "en", name: "English", nativeName: "English", flag: "🇬🇧" },
+  { code: "pt", name: "Português", nativeName: "Português", flag: "🇵🇹" },
+  { code: "es", name: "Español", nativeName: "Español", flag: "🇪🇸" },
+  { code: "dyu", name: "Dioula", nativeName: "Jula", flag: "🇨🇮" },
+  { code: "mos", name: "Mooré", nativeName: "Mòoré", flag: "🇧🇫" },
+  { code: "ha", name: "Haoussa", nativeName: "Harshen Hausa", flag: "🇳🇬" },
 ]
-
-// Grouper les langues par région
-const languageGroups = {
-  "🌍 Mondial": ["fr", "en", "pt", "es"],
-  "🌍 Afrique de l'Ouest": ["dyu", "mos", "ha"],
-}
 
 interface LanguageSelectorProps {
   currentLanguage: string
   onLanguageChange: (code: string) => void
-  variant?: "default" | "minimal" | "full"
+  variant?: "default" | "minimal"
   showLabel?: boolean
 }
 
@@ -52,27 +43,19 @@ export function LanguageSelector({
   showLabel = false 
 }: LanguageSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [recentLanguages, setRecentLanguages] = useLocalStorage<string[]>("recentLanguages", [])
+  const [mounted, setMounted] = useState(false)
   
   const current = languages.find(l => l.code === currentLanguage) || languages[0]
 
-  // Ajouter la langue aux récentes quand elle change
   useEffect(() => {
-    if (currentLanguage) {
-      setRecentLanguages(prev => {
-        const filtered = prev.filter(code => code !== currentLanguage)
-        return [currentLanguage, ...filtered].slice(0, 3)
-      })
-    }
-  }, [currentLanguage, setRecentLanguages])
+    setMounted(true)
+  }, [])
 
   const handleLanguageChange = (code: string) => {
     onLanguageChange(code)
     setIsOpen(false)
-    
-    // Afficher un toast de confirmation
     const lang = languages.find(l => l.code === code)
-    if (lang) {
+    if (lang && mounted) {
       showToast(`Langue changée : ${lang.name}`, "success")
     }
   }
@@ -81,12 +64,12 @@ export function LanguageSelector({
     <DropdownMenuItem
       key={lang.code}
       onClick={() => handleLanguageChange(lang.code)}
-      className={`flex items-center justify-between cursor-pointer py-2.5 px-3 ${
+      className={`flex items-center justify-between cursor-pointer py-2 px-3 ${
         isActive ? "bg-green-50 text-green-700" : "hover:bg-gray-50"
       }`}
     >
-      <span className="flex items-center gap-3">
-        <span className="text-xl">{lang.flag}</span>
+      <span className="flex items-center gap-2">
+        <span className="text-lg">{lang.flag}</span>
         <div className="flex flex-col">
           <span className={`text-sm font-medium ${isActive ? "text-green-700" : "text-gray-700"}`}>
             {lang.name}
@@ -113,83 +96,13 @@ export function LanguageSelector({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel className="text-xs font-normal text-gray-500">
-            Changer de langue
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
           {languages.map(lang => getLanguageItem(lang, currentLanguage === lang.code))}
         </DropdownMenuContent>
       </DropdownMenu>
     )
   }
 
-  // Variante complète avec groupes
-  if (variant === "full") {
-    return (
-      <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="gap-2 rounded-xl border-gray-200 hover:border-green-300 hover:bg-green-50 transition-all"
-          >
-            <Globe className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-medium">{current.name}</span>
-            <ChevronDown className="h-3 w-3 text-gray-400" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
-          <DropdownMenuLabel className="flex items-center gap-2 text-xs font-semibold text-gray-500">
-            <Languages className="h-3 w-3" />
-            Choisissez votre langue
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          
-          {/* Langues récentes */}
-          {recentLanguages.length > 0 && (
-            <>
-              <div className="px-2 py-1">
-                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Récentes</p>
-              </div>
-              {recentLanguages.map(code => {
-                const lang = languages.find(l => l.code === code)
-                if (!lang) return null
-                return getLanguageItem(lang, currentLanguage === code)
-              })}
-              <DropdownMenuSeparator />
-            </>
-          )}
-          
-          {/* Langues par groupe */}
-          {Object.entries(languageGroups).map(([groupName, codes]) => (
-            <div key={groupName}>
-              <div className="px-2 py-1">
-                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">{groupName}</p>
-              </div>
-              {codes.map(code => {
-                const lang = languages.find(l => l.code === code)
-                if (!lang) return null
-                return getLanguageItem(lang, currentLanguage === code)
-              })}
-              <DropdownMenuSeparator />
-            </div>
-          ))}
-          
-          <div className="px-3 py-2 bg-gradient-to-r from-green-50 to-blue-50 rounded-b-lg">
-            <div className="flex items-center justify-between text-[10px]">
-              <span className="text-gray-500">🌾 Agro MC Hinos</span>
-              <span className="flex items-center gap-1 text-green-600">
-                <Sparkles className="h-3 w-3" />
-                {languages.length} langues
-              </span>
-            </div>
-          </div>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    )
-  }
-
-  // Variante par défaut (équilibrée)
+  // Variante par défaut
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
@@ -216,7 +129,7 @@ export function LanguageSelector({
         {languages.map(lang => getLanguageItem(lang, currentLanguage === lang.code))}
         <DropdownMenuSeparator />
         <div className="px-3 py-2 text-[10px] text-gray-400 text-center">
-          Traductions participatives
+          {languages.length} langues disponibles
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
