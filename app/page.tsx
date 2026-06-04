@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,6 +22,11 @@ import {
   X,
   MapPin,
   BarChart3,
+  Loader2,
+  Wifi,
+  WifiOff,
+  Pi,
+  CheckCircle,
 } from "lucide-react"
 
 import Dashboard from "@/components/dashboard"
@@ -34,14 +39,20 @@ import ServiceManagement from "@/components/service-management"
 import RegionalAdaptation from "@/components/regional-adaptation"
 import LanguageManager from "@/components/language-manager"
 import GeolocationManager from "@/components/geolocation-manager"
+import { usePiAuth } from "@/contexts/pi-auth-context"
+import { useOnlineStatus } from "@/hooks/use-online-status"
+import { showToast } from "@/lib/utils"
 
 export default function AgroMulticenterApp() {
+  const { isAuthenticated, isLoading, login, userData, error } = usePiAuth()
+  const isOnline = useOnlineStatus()
+  
   const [activeTab, setActiveTab] = useState("home")
   const [currentLanguage, setCurrentLanguage] = useState("fr")
   const [userRegion, setUserRegion] = useState("Burkina Faso")
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showRegistration, setShowRegistration] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(true)
+  const [registrationSuccess, setRegistrationSuccess] = useState(false)
 
   const [registrationData, setRegistrationData] = useState({
     firstName: "",
@@ -52,69 +63,51 @@ export default function AgroMulticenterApp() {
     region: "",
     city: "",
     profession: "",
-    specialties: [],
-    languages: [],
+    specialties: [] as string[],
+    languages: [] as string[],
     piWalletAddress: "",
-    latitude: null,
-    longitude: null,
+    latitude: null as number | null,
+    longitude: null as number | null,
   })
 
   const worldCountries = [
-    { name: "Afghanistan", code: "AF", flag: "🇦🇫", continent: "Asia" },
-    { name: "Albania", code: "AL", flag: "🇦🇱", continent: "Europe" },
-    { name: "Algeria", code: "DZ", flag: "🇩🇿", continent: "Africa" },
     { name: "Burkina Faso", code: "BF", flag: "🇧🇫", continent: "Africa" },
     { name: "Mali", code: "ML", flag: "🇲🇱", continent: "Africa" },
     { name: "Niger", code: "NE", flag: "🇳🇪", continent: "Africa" },
-    { name: "Senegal", code: "SN", flag: "🇸🇳", continent: "Africa" },
+    { name: "Sénégal", code: "SN", flag: "🇸🇳", continent: "Africa" },
     { name: "Côte d'Ivoire", code: "CI", flag: "🇨🇮", continent: "Africa" },
     { name: "Ghana", code: "GH", flag: "🇬🇭", continent: "Africa" },
     { name: "Nigeria", code: "NG", flag: "🇳🇬", continent: "Africa" },
     { name: "France", code: "FR", flag: "🇫🇷", continent: "Europe" },
-    { name: "United States", code: "US", flag: "🇺🇸", continent: "North America" },
-    { name: "Brazil", code: "BR", flag: "🇧🇷", continent: "South America" },
-    { name: "India", code: "IN", flag: "🇮🇳", continent: "Asia" },
-    { name: "China", code: "CN", flag: "🇨🇳", continent: "Asia" },
-    // ... autres pays
   ]
 
   const professions = [
-    "Agriculteur",
-    "Éleveur",
-    "Vétérinaire",
-    "Agronome",
-    "Transformateur agricole",
-    "Commerçant agricole",
-    "Consultant agricole",
-    "Formateur",
-    "Chercheur",
-    "Coopérative",
-    "ONG",
-    "Autre",
+    "Agriculteur", "Éleveur", "Vétérinaire", "Agronome",
+    "Transformateur agricole", "Commerçant agricole", "Consultant agricole",
+    "Formateur", "Chercheur", "Coopérative", "ONG", "Autre",
   ]
 
   const specialties = [
-    "Aviculture",
-    "Bovins",
-    "Ovins/Caprins",
-    "Pisciculture",
-    "Apiculture",
-    "Maraîchage",
-    "Céréales",
-    "Légumineuses",
-    "Fruits",
-    "Transformation",
-    "Marketing",
-    "Finance agricole",
+    "Aviculture", "Bovins", "Ovins/Caprins", "Pisciculture", "Apiculture",
+    "Maraîchage", "Céréales", "Légumineuses", "Fruits", "Transformation",
+    "Marketing", "Finance agricole",
   ]
 
   const availableLanguages = ["Français", "English", "Português", "Dioula", "Mooré", "Haoussa"]
 
-  const handleRegistration = () => {
-    console.log("Données d'inscription:", registrationData)
-    setIsLoggedIn(true)
-    setShowRegistration(false)
-    setUserRegion(registrationData.country)
+  const handleRegistration = async () => {
+    if (!registrationData.firstName || !registrationData.country) {
+      showToast("Veuillez remplir les champs obligatoires", "error")
+      return
+    }
+    
+    setRegistrationSuccess(true)
+    setTimeout(async () => {
+      setShowRegistration(false)
+      setRegistrationSuccess(false)
+      setUserRegion(registrationData.country)
+      await login()
+    }, 1500)
   }
 
   const navigationItems = [
@@ -126,253 +119,102 @@ export default function AgroMulticenterApp() {
     { id: "profile", label: "Profil", icon: User },
     { id: "regional", label: "Régions", icon: Globe },
     { id: "geolocation", label: "Géolocalisation", icon: MapPin },
-    { id: "analytics", label: "Analyses", icon: BarChart3 },
     { id: "settings", label: "Paramètres", icon: Settings },
   ]
 
-  if (!isLoggedIn) {
+  // Écran de chargement
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl text-white font-bold">🌾</span>
+        <div className="text-center">
+          <div className="relative">
+            <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+              <span className="text-3xl text-white animate-pulse">🌾</span>
             </div>
-            <CardTitle className="text-2xl font-bold text-gray-900">AGRO MULTICENTER HINOS</CardTitle>
-            <p className="text-gray-600">Plateforme agricole mondiale</p>
+            <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center text-xs font-bold text-white animate-bounce">
+              π
+            </div>
+          </div>
+          <Loader2 className="h-8 w-8 animate-spin text-green-600 mx-auto mb-4" />
+          <p className="text-gray-600">Chargement...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Écran de connexion
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md border-0 shadow-xl">
+          <CardHeader className="text-center">
+            <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <span className="text-3xl text-white">🌾</span>
+            </div>
+            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-green-700 to-blue-700 bg-clip-text text-transparent">
+              AGRO MULTICENTER HINOS
+            </CardTitle>
+            <p className="text-gray-500 mt-1">Plateforme agricole connectée</p>
+            {!isOnline && (
+              <div className="mt-2 text-xs text-yellow-600 bg-yellow-50 rounded-lg p-2">
+                ⚠️ Connexion internet requise
+              </div>
+            )}
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => setIsLoggedIn(true)}>
+          <CardContent className="space-y-3">
+            <Button 
+              className="w-full bg-purple-600 hover:bg-purple-700 gap-2" 
+              onClick={login}
+              disabled={!isOnline}
+            >
+              <Pi className="h-4 w-4" />
               Se connecter avec Pi Network
             </Button>
-            <Button variant="outline" className="w-full bg-transparent" onClick={() => setShowRegistration(true)}>
-              Créer un compte
+            <Button 
+              variant="outline" 
+              className="w-full border-green-500 text-green-600 hover:bg-green-50" 
+              onClick={() => setShowRegistration(true)}
+            >
+              ✨ Créer un compte
             </Button>
+            {error && <p className="text-xs text-red-500 text-center">{error}</p>}
           </CardContent>
         </Card>
 
-        {/* Registration Dialog */}
-        <Dialog open={showRegistration} onOpenChange={setShowRegistration}>
+        {/* Dialog d'inscription */}
+        <Dialog open={showRegistration} onOpenChange={(open) => {
+          if (!open) setRegistrationSuccess(false)
+          setShowRegistration(open)
+        }}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Inscription à Agro Multicenter Hinos</DialogTitle>
+              <DialogTitle className="text-xl">✨ Inscription à Agro Multicenter Hinos</DialogTitle>
+              <p className="text-sm text-gray-500">Rejoignez la communauté agricole</p>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="firstName">Prénom</Label>
-                  <Input
-                    id="firstName"
-                    value={registrationData.firstName}
-                    onChange={(e) => setRegistrationData({ ...registrationData, firstName: e.target.value })}
-                  />
+            
+            {registrationSuccess ? (
+              <div className="py-8 text-center">
+                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                <h3 className="text-lg font-semibold text-green-700">Inscription réussie !</h3>
+                <p className="text-gray-500 mt-1">Redirection en cours...</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div><Label>Prénom *</Label><Input value={registrationData.firstName} onChange={(e) => setRegistrationData({ ...registrationData, firstName: e.target.value })} /></div>
+                  <div><Label>Nom</Label><Input value={registrationData.lastName} onChange={(e) => setRegistrationData({ ...registrationData, lastName: e.target.value })} /></div>
                 </div>
-                <div>
-                  <Label htmlFor="lastName">Nom</Label>
-                  <Input
-                    id="lastName"
-                    value={registrationData.lastName}
-                    onChange={(e) => setRegistrationData({ ...registrationData, lastName: e.target.value })}
-                  />
-                </div>
+                <div><Label>Email</Label><Input type="email" value={registrationData.email} onChange={(e) => setRegistrationData({ ...registrationData, email: e.target.value })} /></div>
+                <div><Label>Téléphone</Label><Input value={registrationData.phone} onChange={(e) => setRegistrationData({ ...registrationData, phone: e.target.value })} /></div>
+                <div><Label>Pays *</Label><Select value={registrationData.country} onValueChange={(value) => setRegistrationData({ ...registrationData, country: value })}><SelectTrigger><SelectValue placeholder="Sélectionnez votre pays" /></SelectTrigger><SelectContent>{worldCountries.map((c) => (<SelectItem key={c.code} value={c.name}><span className="flex items-center gap-2"><span>{c.flag}</span><span>{c.name}</span></span></SelectItem>))}</SelectContent></Select></div>
+                <div className="grid grid-cols-2 gap-4"><div><Label>Région</Label><Input value={registrationData.region} onChange={(e) => setRegistrationData({ ...registrationData, region: e.target.value })} /></div><div><Label>Ville</Label><Input value={registrationData.city} onChange={(e) => setRegistrationData({ ...registrationData, city: e.target.value })} /></div></div>
+                <div><Label>Profession</Label><Select value={registrationData.profession} onValueChange={(value) => setRegistrationData({ ...registrationData, profession: value })}><SelectTrigger><SelectValue placeholder="Sélectionnez votre profession" /></SelectTrigger><SelectContent>{professions.map((p) => (<SelectItem key={p} value={p}>{p}</SelectItem>))}</SelectContent></Select></div>
+                <div><Label>Spécialités</Label><div className="grid grid-cols-2 gap-2 mt-2">{specialties.slice(0, 8).map((s) => (<label key={s} className="flex items-center gap-2"><input type="checkbox" checked={registrationData.specialties.includes(s)} onChange={(e) => { if (e.target.checked) setRegistrationData({ ...registrationData, specialties: [...registrationData.specialties, s] }); else setRegistrationData({ ...registrationData, specialties: registrationData.specialties.filter(sp => sp !== s) }) }} className="rounded border-gray-300" /><span className="text-sm">{s}</span></label>))}</div></div>
+                <div><Label>Langues</Label><div className="grid grid-cols-2 gap-2 mt-2">{availableLanguages.map((l) => (<label key={l} className="flex items-center gap-2"><input type="checkbox" checked={registrationData.languages.includes(l)} onChange={(e) => { if (e.target.checked) setRegistrationData({ ...registrationData, languages: [...registrationData.languages, l] }); else setRegistrationData({ ...registrationData, languages: registrationData.languages.filter(lg => lg !== l) }) }} className="rounded border-gray-300" /><span className="text-sm">{l}</span></label>))}</div></div>
+                <div><Label>Adresse Portefeuille Pi</Label><Input placeholder="Votre adresse Pi Network" value={registrationData.piWalletAddress} onChange={(e) => setRegistrationData({ ...registrationData, piWalletAddress: e.target.value })} /></div>
+                <Button onClick={handleRegistration} className="w-full bg-green-600 hover:bg-green-700">Créer mon compte</Button>
               </div>
-
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={registrationData.email}
-                  onChange={(e) => setRegistrationData({ ...registrationData, email: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="phone">Téléphone</Label>
-                <Input
-                  id="phone"
-                  value={registrationData.phone}
-                  onChange={(e) => setRegistrationData({ ...registrationData, phone: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="country">Pays</Label>
-                <Select
-                  value={registrationData.country}
-                  onValueChange={(value) => setRegistrationData({ ...registrationData, country: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez votre pays" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {worldCountries.map((country) => (
-                      <SelectItem key={country.code} value={country.name}>
-                        <div className="flex items-center space-x-2">
-                          <span>{country.flag}</span>
-                          <span>{country.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="geolocation">Géolocalisation (Obligatoire)</Label>
-                <div className="space-y-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full bg-transparent"
-                    onClick={() => {
-                      if (navigator.geolocation) {
-                        navigator.geolocation.getCurrentPosition(
-                          (position) => {
-                            console.log("Position:", position.coords.latitude, position.coords.longitude)
-                            setRegistrationData({
-                              ...registrationData,
-                              latitude: position.coords.latitude,
-                              longitude: position.coords.longitude,
-                            })
-                          },
-                          (error) => {
-                            console.error("Erreur de géolocalisation:", error)
-                          },
-                        )
-                      }
-                    }}
-                  >
-                    📍 Détecter ma position automatiquement
-                  </Button>
-                  <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded-lg">
-                    <p className="font-medium text-blue-800 mb-1">Pourquoi la géolocalisation ?</p>
-                    <ul className="space-y-1 text-blue-700">
-                      <li>• Conseils agricoles adaptés à votre climat</li>
-                      <li>• Connexion avec des utilisateurs proches</li>
-                      <li>• Marketplace régional personnalisé</li>
-                      <li>• Alertes météo et agricoles locales</li>
-                    </ul>
-                  </div>
-                  <div className="text-xs text-gray-500 bg-green-50 p-3 rounded-lg">
-                    <p className="font-medium text-green-800 mb-1">🔒 Respect de votre vie privée</p>
-                    <ul className="space-y-1 text-green-700">
-                      <li>• Données chiffrées conformes au RGPD</li>
-                      <li>• Géolocalisation désactivable après inscription</li>
-                      <li>• Transparence totale sur l'utilisation</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="region">Région/État</Label>
-                  <Input
-                    id="region"
-                    value={registrationData.region}
-                    onChange={(e) => setRegistrationData({ ...registrationData, region: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="city">Ville</Label>
-                  <Input
-                    id="city"
-                    value={registrationData.city}
-                    onChange={(e) => setRegistrationData({ ...registrationData, city: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="profession">Profession</Label>
-                <Select
-                  value={registrationData.profession}
-                  onValueChange={(value) => setRegistrationData({ ...registrationData, profession: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez votre profession" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {professions.map((profession) => (
-                      <SelectItem key={profession} value={profession}>
-                        {profession}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label>Spécialités (sélectionnez plusieurs)</Label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {specialties.map((specialty) => (
-                    <label key={specialty} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={registrationData.specialties.includes(specialty)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setRegistrationData({
-                              ...registrationData,
-                              specialties: [...registrationData.specialties, specialty],
-                            })
-                          } else {
-                            setRegistrationData({
-                              ...registrationData,
-                              specialties: registrationData.specialties.filter((s) => s !== specialty),
-                            })
-                          }
-                        }}
-                      />
-                      <span className="text-sm">{specialty}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <Label>Langues parlées</Label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {availableLanguages.slice(0, 12).map((language) => (
-                    <label key={language} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={registrationData.languages.includes(language)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setRegistrationData({
-                              ...registrationData,
-                              languages: [...registrationData.languages, language],
-                            })
-                          } else {
-                            setRegistrationData({
-                              ...registrationData,
-                              languages: registrationData.languages.filter((l) => l !== language),
-                            })
-                          }
-                        }}
-                      />
-                      <span className="text-sm">{language}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="piWallet">Adresse Portefeuille Pi Network</Label>
-                <Input
-                  id="piWallet"
-                  value={registrationData.piWalletAddress}
-                  onChange={(e) => setRegistrationData({ ...registrationData, piWalletAddress: e.target.value })}
-                  placeholder="Votre adresse Pi Network"
-                />
-              </div>
-
-              <Button onClick={handleRegistration} className="w-full bg-green-600 hover:bg-green-700">
-                Créer mon compte
-              </Button>
-            </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
@@ -383,191 +225,87 @@ export default function AgroMulticenterApp() {
     <div className="min-h-screen bg-gray-50">
       {/* Mobile Header */}
       <div className="lg:hidden bg-white border-b px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center">
-            <span className="text-white font-bold text-sm">🌾</span>
-          </div>
-          <h1 className="font-bold text-lg">AGRO MC HINOS</h1>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center"><span className="text-white text-sm">🌾</span></div>
+          <h1 className="font-bold text-lg text-green-800">AGRO MC HINOS</h1>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-          {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
+        <div className="flex items-center gap-2">
+          {!isOnline && <WifiOff className="h-4 w-4 text-yellow-500" />}
+          <Button variant="ghost" size="sm" onClick={() => setIsMenuOpen(!isMenuOpen)}>{isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</Button>
+        </div>
       </div>
 
       <div className="flex">
         {/* Sidebar */}
-        <div
-          className={`${
-            isMenuOpen ? "translate-x-0" : "-translate-x-full"
-          } lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r transition-transform duration-300 ease-in-out`}
-        >
-          <div className="p-6 border-b">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold">🌾</span>
-              </div>
-              <div>
-                <h1 className="font-bold text-lg">AGRO MULTICENTER</h1>
-                <p className="text-xs text-gray-500">HINOS</p>
-              </div>
+        <div className={`${isMenuOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r shadow-lg transition-transform duration-300`}>
+          <div className="p-5 border-b bg-gradient-to-r from-green-50 to-blue-50">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-blue-600 rounded-xl flex items-center justify-center"><span className="text-white text-xl">🌾</span></div>
+              <div><h1 className="font-bold text-green-800">AGRO MULTICENTER</h1><p className="text-xs text-gray-500">HINOS</p></div>
             </div>
+            <div className="mt-3 pt-2 border-t border-gray-100"><p className="text-xs text-gray-500">👋 {userData?.username || "Agriculteur"}</p></div>
           </div>
 
-          <nav className="p-4 space-y-2">
+          <nav className="p-3 space-y-1">
             {navigationItems.map((item) => {
               const Icon = item.icon
+              const isActive = activeTab === item.id || (item.id === "marketplace" && ["services"].includes(activeTab))
               return (
-                <Button
-                  key={item.id}
-                  variant={activeTab === item.id ? "default" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setActiveTab(item.id)
-                    setIsMenuOpen(false)
-                  }}
-                >
-                  <Icon className="h-4 w-4 mr-3" />
-                  {item.label}
+                <Button key={item.id} variant={isActive ? "default" : "ghost"} className={`w-full justify-start ${isActive ? "bg-green-600 hover:bg-green-700" : "hover:bg-green-50"}`} onClick={() => { setActiveTab(item.id); setIsMenuOpen(false) }}>
+                  <Icon className="h-4 w-4 mr-3" /> {item.label}
                 </Button>
               )
             })}
           </nav>
 
           <div className="absolute bottom-4 left-4 right-4">
-            <div className="bg-gradient-to-r from-green-500 to-blue-600 text-white p-3 rounded-lg text-center">
-              <p className="text-sm font-medium">Région actuelle</p>
-              <p className="text-xs">{userRegion}</p>
+            <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-3 rounded-xl shadow-md text-center">
+              <p className="text-xs opacity-90">📍 Position</p>
+              <p className="text-sm font-semibold">{userRegion}</p>
+              {!isOnline && <WifiOff className="h-3 w-3 mx-auto mt-1 opacity-70" />}
             </div>
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 lg:ml-0">
+        <div className="flex-1 lg:ml-0 pb-20 lg:pb-6">
           <div className="p-4 lg:p-6">
             {/* Header */}
             <div className="hidden lg:flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">
-                  {navigationItems.find((item) => item.id === activeTab)?.label}
-                </h2>
-                <p className="text-gray-600">Bienvenue sur votre plateforme agricole mondiale</p>
+                <h2 className="text-2xl font-bold text-gray-900">{navigationItems.find((item) => item.id === activeTab)?.label}</h2>
+                <p className="text-gray-500">Bienvenue {userData?.username?.split(" ")[0] || "Agriculteur"} 👋</p>
               </div>
-              <div className="flex items-center space-x-4">
-                <Button variant="outline" size="sm">
-                  <Bell className="h-4 w-4 mr-2" />
-                  Notifications
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Search className="h-4 w-4 mr-2" />
-                  Rechercher
-                </Button>
+              <div className="flex items-center gap-3">
+                {!isOnline && <Badge variant="outline" className="text-yellow-600 border-yellow-300 gap-1"><WifiOff className="h-3 w-3" />Hors ligne</Badge>}
+                <Button variant="outline" size="sm" className="gap-2"><Bell className="h-4 w-4" />Notifications</Button>
                 <LanguageManager currentLanguage={currentLanguage} onLanguageChange={setCurrentLanguage} />
               </div>
             </div>
 
             {/* Tab Content */}
             <div className="space-y-6">
-              {activeTab === "home" && (
-                <Dashboard currentLanguage={currentLanguage} userRegion={userRegion} onTabChange={setActiveTab} />
-              )}
-
-              {activeTab === "aviculture" && (
-                <AvicultureManagement currentLanguage={currentLanguage} userRegion={userRegion} />
-              )}
-
-              {activeTab === "services" && (
-                <ServiceManagement currentLanguage={currentLanguage} userRegion={userRegion} />
-              )}
-
-              {activeTab === "messages" && (
-                <MessagingSystem currentLanguage={currentLanguage} userRegion={userRegion} />
-              )}
-
-              {activeTab === "wallet" && (
-                <PiWalletIntegration currentLanguage={currentLanguage} userRegion={userRegion} />
-              )}
-
+              {activeTab === "home" && <Dashboard currentLanguage={currentLanguage} userRegion={userRegion} onTabChange={setActiveTab} />}
+              {activeTab === "aviculture" && <AvicultureManagement currentLanguage={currentLanguage} userRegion={userRegion} />}
+              {activeTab === "services" && <ServiceManagement currentLanguage={currentLanguage} userRegion={userRegion} />}
+              {activeTab === "messages" && <MessagingSystem currentLanguage={currentLanguage} userRegion={userRegion} />}
+              {activeTab === "wallet" && <PiWalletIntegration currentLanguage={currentLanguage} userRegion={userRegion} />}
               {activeTab === "profile" && <UserProfile currentLanguage={currentLanguage} userRegion={userRegion} />}
-
-              {activeTab === "regional" && (
-                <RegionalAdaptation
-                  currentLanguage={currentLanguage}
-                  userRegion={userRegion}
-                  onRegionChange={setUserRegion}
-                />
-              )}
-
-              {activeTab === "geolocation" && (
-                <GeolocationManager currentLanguage={currentLanguage} userRegion={userRegion} />
-              )}
-
-              {activeTab === "analytics" && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Analyses et Données</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="text-center py-12">
-                      <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">Module d'Analyses</h3>
-                      <p className="text-gray-600 mb-4">
-                        Visualisez vos données agricoles, analysez vos performances et optimisez vos rendements.
-                      </p>
-                      <Button>Accéder aux analyses</Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
+              {activeTab === "regional" && <RegionalAdaptation currentLanguage={currentLanguage} userRegion={userRegion} onRegionChange={setUserRegion} />}
+              {activeTab === "geolocation" && <GeolocationManager currentLanguage={currentLanguage} userRegion={userRegion} />}
               {activeTab === "settings" && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Paramètres de l'application</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">Notifications push</h4>
-                          <p className="text-sm text-gray-500">Recevoir les notifications sur votre appareil</p>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          Activé
-                        </Button>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">Mode sombre</h4>
-                          <p className="text-sm text-gray-500">Utiliser le thème sombre</p>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          Désactivé
-                        </Button>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">Synchronisation automatique</h4>
-                          <p className="text-sm text-gray-500">Synchroniser automatiquement vos données</p>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          Activé
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <Card><CardHeader><CardTitle>Paramètres</CardTitle></CardHeader><CardContent className="space-y-4">
+                  <div className="flex justify-between items-center"><div><h4 className="font-medium">Notifications push</h4><p className="text-sm text-gray-500">Recevoir les alertes</p></div><Button variant="outline" size="sm">Activé</Button></div>
+                  <div className="flex justify-between items-center"><div><h4 className="font-medium">Mode sombre</h4><p className="text-sm text-gray-500">Thème sombre</p></div><Button variant="outline" size="sm">Désactivé</Button></div>
+                  <div className="flex justify-between items-center"><div><h4 className="font-medium">Paiements Pi</h4><p className="text-sm text-gray-500">Tous les prix en π</p></div><Badge className="bg-purple-100 text-purple-700">Actif</Badge></div>
+                </CardContent></Card>
               )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Mobile Navigation */}
-      <MobileNavigation
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        onMenuToggle={() => setIsMenuOpen(!isMenuOpen)}
-      />
+      <MobileNavigation activeTab={activeTab} onTabChange={setActiveTab} onMenuToggle={() => setIsMenuOpen(!isMenuOpen)} />
     </div>
   )
 }
