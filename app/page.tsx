@@ -42,6 +42,7 @@ import {
   Droplets,
   Wind,
   AlertCircle,
+  Shield,
 } from "lucide-react"
 
 import Dashboard from "@/components/dashboard"
@@ -52,8 +53,8 @@ import PiWalletIntegration from "@/components/pi-wallet-integration"
 import MessagingSystem from "@/components/messaging-system"
 import ServiceManagement from "@/components/service-management"
 import RegionalAdaptation from "@/components/regional-adaptation"
-import LanguageManager from "@/components/language-manager"
 import GeolocationManager from "@/components/geolocation-manager"
+import { LanguageSelector } from "@/components/LanguageSelector"
 import { usePiAuth } from "@/contexts/pi-auth-context"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { showToast } from "@/lib/utils"
@@ -182,7 +183,6 @@ export default function AgroMulticenterApp() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full">
-          {/* Logo animé */}
           <div className="text-center mb-8">
             <div className="relative inline-block">
               <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
@@ -199,8 +199,6 @@ export default function AgroMulticenterApp() {
           </div>
 
           <Card className="border-0 shadow-xl rounded-2xl overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 rounded-full -mr-16 -mt-16" />
-            <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-500/10 rounded-full -ml-16 -mb-16" />
             <CardContent className="p-6 relative z-10">
               {!isOnline && (
                 <div className="mb-4 p-3 bg-yellow-50 rounded-xl flex items-center gap-2 text-sm text-yellow-700">
@@ -210,7 +208,7 @@ export default function AgroMulticenterApp() {
               )}
               
               <Button 
-                className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white py-6 rounded-xl gap-3 text-lg font-semibold shadow-lg transition-all duration-300 hover:scale-[1.02]"
+                className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white py-6 rounded-xl gap-3 text-lg font-semibold shadow-lg"
                 onClick={login}
                 disabled={!isOnline}
               >
@@ -229,7 +227,7 @@ export default function AgroMulticenterApp() {
 
               <Button 
                 variant="outline" 
-                className="w-full border-2 border-green-200 text-green-600 hover:bg-green-50 py-6 rounded-xl gap-2 text-base font-medium transition-all"
+                className="w-full border-2 border-green-200 text-green-600 hover:bg-green-50 py-6 rounded-xl gap-2 text-base font-medium"
                 onClick={() => setShowRegistration(true)}
               >
                 <Sparkles className="h-5 w-5" />
@@ -323,6 +321,8 @@ export default function AgroMulticenterApp() {
             <Clock className="h-3 w-3" />
             {formatTime(currentTime)}
           </div>
+          {/* LanguageSelector compact sur mobile */}
+          <LanguageSelector currentLanguage={currentLanguage} onLanguageChange={setCurrentLanguage} />
           <Button variant="ghost" size="sm" onClick={() => setIsMenuOpen(!isMenuOpen)} className="h-8 w-8 p-0 rounded-full hover:bg-gray-100">
             {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
@@ -439,7 +439,8 @@ export default function AgroMulticenterApp() {
                   <Clock className="h-4 w-4" />
                   {formatTime(currentTime)}
                 </div>
-                <LanguageManager currentLanguage={currentLanguage} onLanguageChange={setCurrentLanguage} />
+                {/* LanguageSelector compact sur desktop */}
+                <LanguageSelector currentLanguage={currentLanguage} onLanguageChange={setCurrentLanguage} />
               </div>
             </div>
           </div>
@@ -492,10 +493,3 @@ export default function AgroMulticenterApp() {
     </div>
   )
 }
-
-// Composant Shield manquant
-const Shield = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-  </svg>
-)
