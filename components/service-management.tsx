@@ -37,7 +37,6 @@ import { usePiAuth } from "@/contexts/pi-auth-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { showToast } from "@/lib/utils"
 import { createPiPayment, isPiSDKAvailable } from "@/lib/pi-payments"
-
 interface ServiceManagementProps {
   currentLanguage: string
   userRegion: string
