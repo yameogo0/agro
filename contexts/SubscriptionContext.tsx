@@ -44,10 +44,10 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
   const subscribe = async (): Promise<boolean> => {
     console.log("🔵 Abonnement - Début")
-    const success = await processPayment(
-      SUBSCRIPTION_PRICE,
-      `Abonnement Membre Vif (${SUBSCRIPTION_DURATION_DAYS} jours)`, // ✅ CORRIGÉ
-      (paymentId) => {
+    const success = await processPayment({
+      amount: SUBSCRIPTION_PRICE,
+      memo: `Abonnement Membre Vif (${SUBSCRIPTION_DURATION_DAYS} jours)`,
+      onSuccess: (paymentId) => {
         console.log("🔵 Abonnement - Paiement réussi", paymentId)
         const currentValid = isSubscriptionValid()
         if (currentValid) {
@@ -58,8 +58,12 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
           showToast('👑 Bienvenue Membre Vif !', 'success')
         }
         checkStatus()
+      },
+      onError: (error) => {
+        console.error("🔴 Abonnement - Erreur:", error)
+        showToast('Le paiement a échoué. Veuillez réessayer.', 'error')
       }
-    )
+    })
     console.log("🔵 Abonnement - Résultat:", success)
     return success
   }
@@ -70,7 +74,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       isExpired: !isVif && !!expiryDate,
       expiryDate,
       remainingDays,
-      isLoading,
+      isLoading: isLoading || isProcessing,
       subscribe,
       checkStatus,
     }}>
