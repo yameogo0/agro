@@ -5,7 +5,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'
 import { getSubscription, isSubscriptionValid, activateVif, renewSubscription } from '@/lib/subscription/subscription-storage'
 import { SUBSCRIPTION_PRICE, SUBSCRIPTION_DURATION_DAYS } from '@/lib/subscription/subscription-constants'
-import { usePiPayment } from '@/hooks/usePiPayment'
+import { createPiPayment, isPiSDKAvailable } from '@/lib/pi-payments'
+import { usePiAuth } from '@/contexts/pi-auth-context'
+import { useOnlineStatus } from '@/hooks/use-online-status'
 import { showToast } from '@/lib/utils'
 
 interface SubscriptionContextType {
@@ -24,7 +26,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const [isVif, setIsVif] = useState(false)
   const [expiryDate, setExpiryDate] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const { processPayment, isProcessing } = usePiPayment()
+  const [isProcessing, setIsProcessing] = useState(false)
+  const { isAuthenticated } = usePiAuth()
+  const isOnline = useOnlineStatus()
 
   const checkStatus = useCallback(() => {
     const valid = isSubscriptionValid()
@@ -43,44 +47,58 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     : 0
 
   const subscribe = async (): Promise<boolean> => {
-    console.log("🔵 Abonnement - Début")
-    console.log("🔵 Prix:", SUBSCRIPTION_PRICE)
-    console.log("🔵 Durée:", SUBSCRIPTION_DURATION_DAYS)
-    
-    const success = await processPayment({
-      amount: SUBSCRIPTION_PRICE,
-      memo: `Abonnement Membre Vif (${SUBSCRIPTION_DURATION_DAYS} jours)`,
-      onSuccess: (paymentId) => {
-        console.log("🔵 Abonnement - Paiement réussi", paymentId)
+    // Vérifications préalables
+    if (!isOnline) {
+      showToast("Connexion internet requise", "error")
+      return false
+    }
+    if (!isAuthenticated) {
+      showToast("Veuillez vous connecter avec Pi Network", "error")
+      return false
+    }
+    if (!isPiSDKAvailable()) {
+      showToast("Veuillez ouvrir cette application dans Pi Browser", "error")
+      return false
+    }
+
+    setIsProcessing(true)
+    try {
+      const payment = await createPiPayment(SUBSCRIPTION_PRICE, `Abonnement Membre Vif (${SUBSCRIPTION_DURATION_DAYS} jours)`)
+      if (payment.identifier) {
         const currentValid = isSubscriptionValid()
         if (currentValid) {
-          renewSubscription(paymentId)
-          showToast('✅ Abonnement prolongé de 30 jours !', 'success')
+          renewSubscription(payment.identifier)
+          showToast("✅ Abonnement prolongé de 30 jours !", "success")
         } else {
-          activateVif(SUBSCRIPTION_DURATION_DAYS, paymentId)
-          showToast('👑 Bienvenue Membre Vif !', 'success')
+          activateVif(SUBSCRIPTION_DURATION_DAYS, payment.identifier)
+          showToast("👑 Bienvenue Membre Vif !", "success")
         }
         checkStatus()
-      },
-      onError: (error) => {
-        console.error("🔴 Abonnement - Erreur:", error)
-        showToast('Le paiement a échoué. Veuillez réessayer.', 'error')
+        return true
+      } else {
+        throw new Error("Paiement non confirmé")
       }
-    })
-    console.log("🔵 Abonnement - Résultat:", success)
-    return success
+    } catch (err: any) {
+      console.error("Erreur paiement:", err)
+      showToast(err.message || "Le paiement a échoué", "error")
+      return false
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   return (
-    <SubscriptionContext.Provider value={{
-      isVif,
-      isExpired: !isVif && !!expiryDate,
-      expiryDate,
-      remainingDays,
-      isLoading: isLoading || isProcessing,
-      subscribe,
-      checkStatus,
-    }}>
+    <SubscriptionContext.Provider
+      value={{
+        isVif,
+        isExpired: !isVif && !!expiryDate,
+        expiryDate,
+        remainingDays,
+        isLoading: isLoading || isProcessing,
+        subscribe,
+        checkStatus,
+      }}
+    >
       {children}
     </SubscriptionContext.Provider>
   )
@@ -88,6 +106,6 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
 export const useSubscription = () => {
   const context = useContext(SubscriptionContext)
-  if (!context) throw new Error('useSubscription must be used within SubscriptionProvider')
+  if (!context) throw new Error("useSubscription must be used within SubscriptionProvider")
   return context
 }
