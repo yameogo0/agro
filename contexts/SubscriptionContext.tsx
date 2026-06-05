@@ -44,6 +44,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
   const subscribe = async (): Promise<boolean> => {
     console.log("🔵 Abonnement - Début")
+    console.log("🔵 Prix:", SUBSCRIPTION_PRICE)
+    console.log("🔵 Durée:", SUBSCRIPTION_DURATION_DAYS)
+    
     const success = await processPayment({
       amount: SUBSCRIPTION_PRICE,
       memo: `Abonnement Membre Vif (${SUBSCRIPTION_DURATION_DAYS} jours)`,
