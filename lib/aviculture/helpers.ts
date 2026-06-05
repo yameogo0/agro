@@ -6,6 +6,7 @@ import { PoultryBatch, FeedStock, AnalyticsData } from './types'
  * Calcule le taux de mortalité d'un lot
  */
 export const calculateMortalityRate = (batch: PoultryBatch): number => {
+  if (batch.initialCount === 0) return 0
   return (batch.mortality / batch.initialCount) * 100
 }
 
@@ -15,6 +16,7 @@ export const calculateMortalityRate = (batch: PoultryBatch): number => {
 export const calculateFeedEfficiency = (batch: PoultryBatch): number => {
   if (!batch.weight || batch.count === 0) return 0
   const totalWeight = batch.weight * batch.count
+  if (totalWeight === 0) return 0
   return batch.feedConsumption / totalWeight
 }
 
@@ -37,32 +39,43 @@ export const calculateTotalFeedValue = (feedStock: FeedStock[]): number => {
  * Formate une date pour l'affichage
  */
 export const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  if (!dateString) return ''
+  try {
+    return new Date(dateString).toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+  } catch {
+    return dateString
+  }
 }
 
 /**
  * Formate une date relative (ex: "il y a 2 jours")
  */
 export const formatRelativeDate = (dateString: string): string => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
-  
-  if (diffDays === 0) return "Aujourd'hui"
-  if (diffDays === 1) return "Hier"
-  if (diffDays < 7) return `Il y a ${diffDays} jours`
-  if (diffDays < 30) return `Il y a ${Math.floor(diffDays / 7)} semaines`
-  return formatDate(dateString)
+  try {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+    
+    if (diffDays === 0) return "Aujourd'hui"
+    if (diffDays === 1) return "Hier"
+    if (diffDays < 7) return `Il y a ${diffDays} jours`
+    if (diffDays < 30) return `Il y a ${Math.floor(diffDays / 7)} semaines`
+    if (diffDays < 365) return `Il y a ${Math.floor(diffDays / 30)} mois`
+    return `Il y a ${Math.floor(diffDays / 365)} ans`
+  } catch {
+    return dateString
+  }
 }
 
 /**
  * Vérifie si une échéance est dépassée
  */
 export const isOverdue = (dateString: string): boolean => {
+  if (!dateString) return false
   return new Date(dateString) < new Date()
 }
 
@@ -147,9 +160,57 @@ export const calculateGlobalStats = (batches: PoultryBatch[], feedStock: FeedSto
     totalBirds,
     activeBatches: activeBatches.length,
     totalMortality,
-    mortalityRate: totalBirds > 0 ? (totalMortality / (totalBirds + totalMortality)) * 100 : 0,
+    mortalityRate: (totalBirds + totalMortality) > 0 ? (totalMortality / (totalBirds + totalMortality)) * 100 : 0,
     totalFeedStock,
     feedValue,
     averageEggProduction: avgEggs,
   }
+}
+
+/**
+ * Formate l'heure pour l'affichage
+ */
+export const formatTime = (timeString?: string): string => {
+  if (!timeString) return '--:--'
+  return timeString
+}
+
+/**
+ * Calcule le nombre de jours entre deux dates
+ */
+export const daysBetween = (startDate: string, endDate: string): number => {
+  try {
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const diffTime = Math.abs(end.getTime() - start.getTime())
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Vérifie si un lot est en âge de produire des œufs
+ */
+export const isLayingAge = (batch: PoultryBatch): boolean => {
+  const days = daysBetween(batch.startDate, new Date().toISOString().split('T')[0])
+  return days >= 140 // 20 semaines
+}
+
+/**
+ * Recommandation basée sur la température
+ */
+export const getTemperatureAdvice = (temperature: number): string => {
+  if (temperature < 18) return "❄️ Température trop basse - Augmentez le chauffage"
+  if (temperature > 30) return "🔥 Température trop élevée - Augmentez la ventilation"
+  return "✅ Température idéale"
+}
+
+/**
+ * Recommandation basée sur l'humidité
+ */
+export const getHumidityAdvice = (humidity: number): string => {
+  if (humidity < 40) return "💨 Air trop sec - Augmentez l'humidité"
+  if (humidity > 70) return "💧 Air trop humide - Risques de maladies respiratoires"
+  return "✅ Humidité idéale"
 }
