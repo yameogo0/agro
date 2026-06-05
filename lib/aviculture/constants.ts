@@ -1,8 +1,7 @@
 // lib/aviculture/constants.ts
 
-import { PoultryBatch, HealthRecord, FeedStock, VetService } from './types'
+import { PoultryBatch, HealthRecord, FeedStock, VetService, DailyReport, Alert } from './types'
 
-// Lots de volailles mockés
 export const mockBatches: PoultryBatch[] = [
   {
     id: "batch1",
@@ -14,11 +13,17 @@ export const mockBatches: PoultryBatch[] = [
     expectedEndDate: "2025-03-01",
     location: "Poulailler 1",
     status: "active",
-    notes: "Premier lot de pondeuses de la saison",
+    notes: "Premier lot de pondeuses de la saison. Excellente santé.",
     mortality: 50,
     weight: 1.8,
     feedConsumption: 1250,
+    waterConsumption: 2500,
     eggProduction: 380,
+    eggQuality: "good",
+    temperature: 28,
+    humidity: 65,
+    createdAt: "2024-03-01T08:00:00Z",
+    updatedAt: "2024-06-01T08:00:00Z",
   },
   {
     id: "batch2",
@@ -30,43 +35,16 @@ export const mockBatches: PoultryBatch[] = [
     expectedEndDate: "2024-06-20",
     location: "Poulailler 2",
     status: "active",
-    notes: "Élevage pour la viande",
+    notes: "Élevage pour la viande. Croissance rapide.",
     mortality: 20,
     weight: 2.1,
     feedConsumption: 680,
-  },
-  {
-    id: "batch3",
-    name: "Lot C - Poulettes",
-    breed: "Bovans Brown",
-    count: 380,
-    initialCount: 400,
-    startDate: "2024-05-01",
-    expectedEndDate: "2024-08-01",
-    location: "Poulailler 3",
-    status: "active",
-    mortality: 20,
-    feedConsumption: 450,
-  },
-  {
-    id: "batch4",
-    name: "Lot D - Reproductions",
-    breed: "Kabir",
-    count: 120,
-    initialCount: 120,
-    startDate: "2024-02-15",
-    expectedEndDate: "2024-12-15",
-    location: "Poulailler 1",
-    status: "active",
-    notes: "Race locale améliorée",
-    mortality: 8,
-    weight: 2.3,
-    feedConsumption: 890,
-    eggProduction: 95,
+    waterConsumption: 1360,
+    createdAt: "2024-04-10T08:00:00Z",
+    updatedAt: "2024-06-01T08:00:00Z",
   },
 ]
 
-// Enregistrements santé mockés
 export const mockHealthRecords: HealthRecord[] = [
   {
     id: "health1",
@@ -77,9 +55,11 @@ export const mockHealthRecords: HealthRecord[] = [
     description: "Vaccin contre la maladie de Gumboro",
     product: "Nobilis Gumboro",
     dosage: "0.5 ml/oiseau",
+    administrationMethod: "injection",
     nextDue: "2024-04-15",
     status: "done",
     performedBy: "Dr. Koné",
+    cost: 0.025,
   },
   {
     id: "health2",
@@ -90,44 +70,14 @@ export const mockHealthRecords: HealthRecord[] = [
     description: "Vaccin contre la maladie de Newcastle",
     product: "Newvac",
     dosage: "1 goutte/oiseau",
+    administrationMethod: "spray",
     nextDue: "2024-10-01",
     status: "done",
     performedBy: "Dr. Traoré",
-  },
-  {
-    id: "health3",
-    batchId: "batch2",
-    date: "2024-04-20",
-    type: "treatment",
-    title: "Traitement anticoccidien",
-    description: "Prévention coccidiose",
-    product: "Amprolium",
-    dosage: "1 ml/l eau",
-    nextDue: "2024-05-04",
-    status: "scheduled",
-  },
-  {
-    id: "health4",
-    batchId: "batch3",
-    date: "2024-05-10",
-    type: "checkup",
-    title: "Contrôle de croissance",
-    description: "Pesée et évaluation de l'état de santé général",
-    status: "scheduled",
-  },
-  {
-    id: "health5",
-    batchId: "batch4",
-    date: "2024-03-20",
-    type: "alert",
-    title: "Pic de mortalité suspecté",
-    description: "Surveiller attentivement les signes de maladie respiratoire",
-    status: "overdue",
-    nextDue: "2024-03-25",
+    cost: 0.03,
   },
 ]
 
-// Stocks d'aliments mockés
 export const mockFeedStock: FeedStock[] = [
   { 
     id: "feed1", 
@@ -137,7 +87,10 @@ export const mockFeedStock: FeedStock[] = [
     unit: "kg", 
     pricePerUnit: 0.45, 
     threshold: 200, 
-    supplier: "NutriVolaille" 
+    supplier: "NutriVolaille",
+    supplierContact: "+226 70 12 34 56",
+    lastOrderDate: "2024-05-15",
+    nutritionalInfo: { protein: 22, energy: 2900, calcium: 1.2, phosphorus: 0.8 }
   },
   { 
     id: "feed2", 
@@ -147,31 +100,13 @@ export const mockFeedStock: FeedStock[] = [
     unit: "kg", 
     pricePerUnit: 0.42, 
     threshold: 150, 
-    supplier: "AgriFeed" 
-  },
-  { 
-    id: "feed3", 
-    name: "Aliment ponte", 
-    type: "layer", 
-    currentStock: 1200, 
-    unit: "kg", 
-    pricePerUnit: 0.48, 
-    threshold: 300, 
-    supplier: "NutriVolaille" 
-  },
-  { 
-    id: "feed4", 
-    name: "Aliment finition", 
-    type: "finisher", 
-    currentStock: 350, 
-    unit: "kg", 
-    pricePerUnit: 0.44, 
-    threshold: 100, 
-    supplier: "AgriFeed" 
+    supplier: "AgriFeed",
+    supplierContact: "+226 70 23 45 67",
+    lastOrderDate: "2024-05-20",
+    nutritionalInfo: { protein: 18, energy: 2850, calcium: 1.0, phosphorus: 0.7 }
   },
 ]
 
-// Services vétérinaires mockés
 export const mockVetServices: VetService[] = [
   { 
     id: "svc1", 
@@ -180,9 +115,12 @@ export const mockVetServices: VetService[] = [
     price: 0.015, 
     duration: "2h", 
     available: true, 
-    provider: "Dr. Aminata Traoré", 
+    provider: "Dr. Aminata Traoré",
+    providerContact: "+226 70 34 56 78",
     location: "Ouagadougou", 
-    rating: 4.9 
+    rating: 4.9,
+    reviews: 127,
+    category: "consultation",
   },
   { 
     id: "svc2", 
@@ -191,70 +129,84 @@ export const mockVetServices: VetService[] = [
     price: 0.025, 
     duration: "1 journée", 
     available: true, 
-    provider: "SantéAviaire BF", 
+    provider: "SantéAviaire BF",
+    providerContact: "+226 70 45 67 89",
     location: "Bobo-Dioulasso", 
-    rating: 4.8 
-  },
-  { 
-    id: "svc3", 
-    name: "Analyse de laboratoire", 
-    description: "Diagnostic de maladies aviaires (coproculture, autopsie)", 
-    price: 0.008, 
-    duration: "48h", 
-    available: true, 
-    provider: "Labo vétérinaire national", 
-    location: "Ouagadougou", 
-    rating: 4.7 
-  },
-  { 
-    id: "svc4", 
-    name: "Certification sanitaire", 
-    description: "Inspection et délivrance de certificats pour l'exportation", 
-    price: 0.012, 
-    duration: "3 jours", 
-    available: true, 
-    provider: "Direction des services vétérinaires", 
-    location: "Koudougou", 
-    rating: 4.6 
-  },
-  { 
-    id: "svc5", 
-    name: "Conseil en alimentation", 
-    description: "Élaboration de rations équilibrées pour vos volailles", 
-    price: 0.01, 
-    duration: "2h", 
-    available: true, 
-    provider: "Nutri-Conseil", 
-    location: "À distance", 
-    rating: 4.8 
+    rating: 4.8,
+    reviews: 89,
+    category: "vaccination",
   },
 ]
 
-// Consommations d'aliments mockées (historique)
-export const mockFeedConsumptions = [
-  { id: "cons1", batchId: "batch1", date: "2024-05-01", amount: 45, feedType: "Aliment ponte" },
-  { id: "cons2", batchId: "batch1", date: "2024-05-02", amount: 48, feedType: "Aliment ponte" },
-  { id: "cons3", batchId: "batch2", date: "2024-05-01", amount: 32, feedType: "Aliment croissance" },
-  { id: "cons4", batchId: "batch2", date: "2024-05-02", amount: 35, feedType: "Aliment croissance" },
-  { id: "cons5", batchId: "batch3", date: "2024-05-01", amount: 28, feedType: "Aliment démarrage" },
+export const mockAlerts: Alert[] = [
+  {
+    id: "alert1",
+    type: "stock",
+    severity: "high",
+    title: "Stock alimentaire critique",
+    message: "L'aliment croissance atteint son seuil critique (150 kg). Commandez rapidement.",
+    createdAt: "2024-06-05T08:00:00Z",
+    read: false,
+    actionable: true,
+  },
+  {
+    id: "alert2",
+    type: "vaccination",
+    severity: "medium",
+    title: "Rappel vaccination",
+    message: "Le lot A nécessite un rappel de vaccination Gumboro le 15/06/2024.",
+    batchId: "batch1",
+    createdAt: "2024-06-05T08:00:00Z",
+    read: false,
+    actionable: true,
+  },
 ]
 
-// Statistiques par défaut pour l'aperçu
-export const defaultStats = {
-  totalBirds: 0,
-  totalMortality: 0,
-  totalFeedStock: 0,
-  averageEggProduction: 0,
-  activeBatches: 0,
-  completionRate: 0,
-}
+export const mockDailyReports: DailyReport[] = [
+  {
+    id: "report1",
+    date: "2024-06-04",
+    batchId: "batch1",
+    temperature: 28,
+    humidity: 65,
+    mortality: 2,
+    feedConsumed: 42,
+    waterConsumed: 85,
+    eggCount: 380,
+    observations: "Bonne santé générale, consommation normale.",
+    createdBy: "Agriculteur",
+  },
+  {
+    id: "report2",
+    date: "2024-06-04",
+    batchId: "batch2",
+    temperature: 26,
+    humidity: 60,
+    mortality: 1,
+    feedConsumed: 38,
+    waterConsumed: 76,
+    observations: "Croissance satisfaisante.",
+    createdBy: "Agriculteur",
+  },
+]
 
-// Conseils quotidiens mockés
+// Conseils quotidiens
 export const dailyTips = [
   "Vérifiez la température du poulailler : 32°C la première semaine, réduisez de 2°C chaque semaine.",
   "Nettoyez les abreuvoirs tous les jours pour éviter les maladies.",
   "Un poulet en bonne santé a la crête rouge vif et les yeux brillants.",
   "La consommation d'eau est le double de la consommation d'aliment.",
   "Isoler les oiseaux malades dès les premiers symptômes.",
-  "Une bonne litière sèche réduit les risques respiratoires.",
 ]
+
+// Statistiques par défaut
+export const defaultStats = {
+  totalBirds: 0,
+  activeBatches: 0,
+  totalMortality: 0,
+  mortalityRate: 0,
+  totalFeedStock: 0,
+  feedValue: 0,
+  averageEggProduction: 0,
+  completionRate: 0,
+}
