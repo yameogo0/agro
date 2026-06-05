@@ -1,70 +1,56 @@
-// components/aviculture/FeedingTab.tsx
+"use client";
 
-"use client"
-
-import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Package, ShoppingCart, Loader2, AlertTriangle } from "lucide-react"
-import { useAviculture } from "@/contexts/AvicultureContext"
-import { usePiPayment } from "@/hooks/usePiPayment"
-import { addFeedOrder, updateFeedStockQuantity } from "@/lib/aviculture/storage"
-import { showToast } from "@/lib/utils"
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Package, ShoppingCart, Loader2, AlertTriangle } from "lucide-react";
+import { useAviculture } from "@/contexts/AvicultureContext";
+import { usePiPayment } from "@/hooks/usePiPayment";
+import { addFeedOrder, updateFeedStockQuantity } from "@/lib/aviculture/storage";
+import { showToast } from "@/lib/utils";
 
 export function FeedingTab() {
-  const { feedStock, refreshData } = useAviculture()
-  const { processPayment, isProcessing } = usePiPayment()
-  const [selectedFeedId, setSelectedFeedId] = useState("")
-  const [quantity, setQuantity] = useState(0)
-  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false)
+  const { feedStock, updateFeedStock, refreshData } = useAviculture();
+  const { processPayment, isProcessing } = usePiPayment();
+  const [selectedFeedId, setSelectedFeedId] = useState("");
+  const [quantity, setQuantity] = useState<number>(0);
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
 
-  const lowStockItems = feedStock.filter(f => f.currentStock <= f.threshold)
+  const lowStockItems = feedStock.filter(f => f.currentStock <= f.threshold);
+
+  const selectedFeed = feedStock.find(f => f.id === selectedFeedId);
+  const totalPrice = selectedFeed && quantity > 0 ? selectedFeed.pricePerUnit * quantity : 0;
 
   const handleOrder = async () => {
-    const feed = feedStock.find(f => f.id === selectedFeedId)
-    if (!feed || quantity <= 0) {
-      showToast("Sélectionnez un aliment et une quantité valide", "error")
-      return
+    if (!selectedFeed || quantity <= 0) {
+      showToast("Sélectionnez un aliment et une quantité valide", "error");
+      return;
     }
 
-    const total = feed.pricePerUnit * quantity
-    const memo = `Achat aliment: ${feed.name} x${quantity}kg`
-
-    const success = await processPayment({
-      amount: total,
-      memo: memo,
-      onSuccess: async (paymentId) => {
-        // Mettre à jour le stock
-        updateFeedStockQuantity(feed.id, quantity)
-        // Enregistrer la commande
-        addFeedOrder({
-          feedId: feed.id,
-          quantity,
-          totalPrice: total,
-          date: new Date().toISOString(),
-          paymentId,
-          status: "completed",
-        })
-        refreshData()
-        setIsOrderDialogOpen(false)
-        setQuantity(0)
-        setSelectedFeedId("")
-      },
-      onError: (error) => {
-        console.error("Erreur:", error)
-      },
-    })
-
-    if (!success) {
-      // L'erreur est déjà affichée par le hook
-    }
-  }
+    const memo = `Achat aliment: ${selectedFeed.name} x${quantity}kg`;
+    const success = await processPayment(totalPrice, memo, async (paymentId) => {
+      // Mettre à jour le stock
+      updateFeedStockQuantity(selectedFeed.id, quantity);
+      addFeedOrder({
+        feedId: selectedFeed.id,
+        quantity,
+        totalPrice,
+        date: new Date().toISOString(),
+        paymentId,
+        status: "completed",
+      });
+      refreshData();
+      setIsOrderDialogOpen(false);
+      setQuantity(0);
+      setSelectedFeedId("");
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -85,7 +71,7 @@ export function FeedingTab() {
                   <span>{f.name}</span>
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-red-600">{f.currentStock} kg</span>
-                    <Button size="sm" variant="outline" onClick={() => { setSelectedFeedId(f.id); setIsOrderDialogOpen(true) }}>Commander</Button>
+                    <Button size="sm" variant="outline" onClick={() => { setSelectedFeedId(f.id); setIsOrderDialogOpen(true); }}>Commander</Button>
                   </div>
                 </div>
               ))}
@@ -113,7 +99,7 @@ export function FeedingTab() {
                 <span>Seuil: {feed.threshold} kg</span>
                 <span className="font-semibold text-purple-600">{feed.pricePerUnit} π/kg</span>
               </div>
-              <Button variant="outline" className="w-full" onClick={() => { setSelectedFeedId(feed.id); setIsOrderDialogOpen(true) }}>
+              <Button variant="outline" className="w-full" onClick={() => { setSelectedFeedId(feed.id); setIsOrderDialogOpen(true); }}>
                 <ShoppingCart className="h-4 w-4 mr-2" /> Commander
               </Button>
             </CardContent>
@@ -141,23 +127,23 @@ export function FeedingTab() {
             </div>
             <div>
               <Label>Quantité (kg)</Label>
-              <Input 
-                type="number" 
-                step="10" 
-                value={quantity} 
-                onChange={e => setQuantity(Number(e.target.value))} 
-                placeholder="Ex: 100"
+              <Input
+                type="number"
+                step="1"
+                min="1"
+                value={quantity || ""}
+                onChange={e => setQuantity(Number(e.target.value))}
               />
-              {selectedFeedId && quantity > 0 && (
+              {selectedFeed && quantity > 0 && (
                 <p className="text-sm text-purple-600 mt-1">
-                  Total: {(feedStock.find(f => f.id === selectedFeedId)?.pricePerUnit || 0) * quantity} π
+                  Total: {totalPrice.toFixed(4)} π
                 </p>
               )}
             </div>
-            <Button 
-              onClick={handleOrder} 
-              disabled={isProcessing || !selectedFeedId || quantity <= 0} 
-              className="w-full bg-purple-600 hover:bg-purple-700"
+            <Button
+              onClick={handleOrder}
+              disabled={isProcessing || !selectedFeedId || quantity <= 0}
+              className="w-full"
             >
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
               Payer avec Pi
@@ -166,5 +152,5 @@ export function FeedingTab() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
