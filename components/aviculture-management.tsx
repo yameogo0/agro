@@ -6,448 +6,551 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Progress } from "@/components/ui/progress"
 import {
-  Users,
-  Heart,
-  Utensils,
   TrendingUp,
-  Package,
-  BarChart3,
-  GraduationCap,
-  Share2,
-  Headphones,
-  ShoppingCart,
-  Plus,
-  Search,
-  Filter,
-  Calendar,
-  MapPin,
-  Star,
-  Clock,
-  AlertTriangle,
-  CheckCircle,
+  TrendingDown,
   Activity,
-  Thermometer,
-  Droplets,
-  Wifi,
-  WifiOff,
-  Loader2,
-  RefreshCw,
+  Pill,
+  Syringe,
+  Apple,
+  Calendar,
+  Plus,
   Edit,
   Trash2,
-  Download,
-  Printer,
-  Eye,
+  AlertTriangle,
+  CheckCircle,
+  X,
+  Loader2,
+  WifiOff,
+  RefreshCw,
   PieChart,
   LineChart,
-  Egg,
+  Package,
+  ShoppingCart,
+  Phone,
+  MapPin,
+  Clock,
+  Heart,
+  Droplets,
+  Thermometer,
   Weight,
-  Syringe,
-  Tractor,
-  X,
+  Egg,
+  Users,
+  AlertCircle,
 } from "lucide-react"
+
 import { useOnlineStatus } from "@/hooks/use-online-status"
+import { usePiAuth } from "@/contexts/pi-auth-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
-import { showToast, formatDate, formatNumber } from "@/lib/utils"
-import { Progress } from "@/components/ui/progress"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { showToast } from "@/lib/utils"
+import { createPiPayment, isPiSDKAvailable } from "@/lib/pi-payments"
 
 interface AvicultureManagementProps {
   currentLanguage: string
   userRegion: string
 }
 
-interface Batch {
+// Types
+interface PoultryBatch {
   id: string
   name: string
-  type: "pondeuses" | "poulets" | "reproducteurs"
-  birds: number
-  age: number
-  health: "bon" | "moyen" | "critique"
-  eggs?: number
-  weight?: number
+  breed: string
+  count: number
+  initialCount: number
+  startDate: string
+  expectedEndDate: string
+  location: string
+  status: "active" | "completed" | "culled"
+  notes?: string
   mortality: number
-  createdAt: string
-  lastVaccination?: string
-  nextVaccination?: string
-}
-
-interface FeedItem {
-  type: string
-  quantity: number
-  unit: string
-  costPerUnit: number
-  lastOrder: string
-  supplier: string
+  weight?: number // average weight in kg
+  feedConsumption: number // total feed consumed in kg
+  eggProduction?: number // daily egg production
 }
 
 interface HealthRecord {
   id: string
   batchId: string
   date: string
-  type: "vaccination" | "checkup" | "treatment"
+  type: "vaccination" | "treatment" | "checkup" | "alert"
+  title: string
   description: string
-  veterinarian?: string
-  cost: number
+  product?: string
+  dosage?: string
+  nextDue?: string
+  status: "done" | "scheduled" | "overdue"
+  performedBy?: string
 }
 
-interface ProductionStat {
-  date: string
-  eggs: number
-  mortality: number
-  avgWeight: number
-  feedConsumption: number
-}
-
-interface Service {
+interface FeedStock {
   id: string
-  provider: string
-  service: string
-  price: number
-  rating: number
-  location: string
-  available: boolean
-  phone?: string
-  experience?: number
+  name: string
+  type: "starter" | "grower" | "layer" | "finisher"
+  currentStock: number // kg
+  unit: string
+  pricePerUnit: number // Pi
+  threshold: number
+  supplier: string
 }
+
+interface FeedConsumptionRecord {
+  id: string
+  batchId: string
+  date: string
+  amount: number // kg
+  feedType: string
+}
+
+interface VetService {
+  id: string
+  name: string
+  description: string
+  price: number
+  duration: string
+  available: boolean
+  provider: string
+  location: string
+  rating: number
+}
+
+// Données mockées initiales
+const mockBatches: PoultryBatch[] = [
+  {
+    id: "batch1",
+    name: "Lot A - Pondeuses Mars",
+    breed: "Isa Brown",
+    count: 450,
+    initialCount: 500,
+    startDate: "2024-03-01",
+    expectedEndDate: "2025-03-01",
+    location: "Poulailler 1",
+    status: "active",
+    mortality: 50,
+    weight: 1.8,
+    feedConsumption: 1250,
+    eggProduction: 380,
+  },
+  {
+    id: "batch2",
+    name: "Lot B - Poulets de chair",
+    breed: "Cobb 500",
+    count: 280,
+    initialCount: 300,
+    startDate: "2024-04-10",
+    expectedEndDate: "2024-06-20",
+    location: "Poulailler 2",
+    status: "active",
+    mortality: 20,
+    weight: 2.1,
+    feedConsumption: 680,
+  },
+]
+
+const mockHealthRecords: HealthRecord[] = [
+  {
+    id: "health1",
+    batchId: "batch1",
+    date: "2024-03-15",
+    type: "vaccination",
+    title: "Vaccin Gumboro",
+    description: "Vaccin contre la maladie de Gumboro",
+    product: "Nobilis Gumboro",
+    dosage: "0.5 ml/oiseau",
+    nextDue: "2024-04-15",
+    status: "done",
+    performedBy: "Dr. Koné",
+  },
+  {
+    id: "health2",
+    batchId: "batch2",
+    date: "2024-04-20",
+    type: "treatment",
+    title: "Traitement anticoccidien",
+    description: "Prévention coccidiose",
+    product: "Amprolium",
+    dosage: "1 ml/l eau",
+    nextDue: "2024-05-04",
+    status: "scheduled",
+  },
+]
+
+const mockFeedStock: FeedStock[] = [
+  { id: "feed1", name: "Aliment démarrage", type: "starter", currentStock: 850, unit: "kg", pricePerUnit: 0.45, threshold: 200, supplier: "NutriVolaille" },
+  { id: "feed2", name: "Aliment croissance", type: "grower", currentStock: 420, unit: "kg", pricePerUnit: 0.42, threshold: 150, supplier: "AgriFeed" },
+  { id: "feed3", name: "Aliment ponte", type: "layer", currentStock: 1200, unit: "kg", pricePerUnit: 0.48, threshold: 300, supplier: "NutriVolaille" },
+]
+
+const mockVetServices: VetService[] = [
+  { id: "svc1", name: "Consultation vétérinaire à domicile", description: "Examen complet de l'élevage", price: 0.015, duration: "2h", available: true, provider: "Dr. Aminata Traoré", location: "Ouagadougou", rating: 4.9 },
+  { id: "svc2", name: "Programme de vaccination complet", description: "Vaccination pour tout le cheptel", price: 0.025, duration: "1 journée", available: true, provider: "SantéAviaire BF", location: "Bobo-Dioulasso", rating: 4.8 },
+  { id: "svc3", name: "Analyse de laboratoire", description: "Diagnostic de maladies aviaires", price: 0.008, duration: "48h", available: true, provider: "Labo vétérinaire national", location: "Ouagadougou", rating: 4.7 },
+]
 
 export default function AvicultureManagement({ currentLanguage, userRegion }: AvicultureManagementProps) {
   const isOnline = useOnlineStatus()
+  const { isAuthenticated, userData } = usePiAuth()
   const [activeTab, setActiveTab] = useState("overview")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null)
-  const [showBatchModal, setShowBatchModal] = useState(false)
-  const [showHealthModal, setShowHealthModal] = useState(false)
-  const [editingBatch, setEditingBatch] = useState<Batch | null>(null)
 
-  // Données persistantes
-  const [batches, setBatches] = useLocalStorage<Batch[]>("avicultureBatches", [
-    { id: "batch-1", name: "Lot pondeuses A", type: "pondeuses", birds: 1250, age: 18, health: "bon", eggs: 890, mortality: 2.1, createdAt: "2024-01-01", lastVaccination: "2024-01-15", nextVaccination: "2024-02-15" },
-    { id: "batch-2", name: "Lot poulets B", type: "poulets", birds: 800, age: 6, health: "bon", weight: 1.2, mortality: 1.5, createdAt: "2024-01-10", lastVaccination: "2024-01-20", nextVaccination: "2024-02-20" },
-    { id: "batch-3", name: "Lot reproducteurs C", type: "reproducteurs", birds: 300, age: 24, health: "bon", eggs: 180, mortality: 0.8, createdAt: "2023-12-01", lastVaccination: "2024-01-10", nextVaccination: "2024-02-10" },
-  ])
+  // États principaux
+  const [batches, setBatches] = useLocalStorage<PoultryBatch[]>("aviculture_batches", mockBatches)
+  const [healthRecords, setHealthRecords] = useLocalStorage<HealthRecord[]>("aviculture_health", mockHealthRecords)
+  const [feedStock, setFeedStock] = useLocalStorage<FeedStock[]>("aviculture_feed", mockFeedStock)
+  const [feedConsumptions, setFeedConsumptions] = useLocalStorage<FeedConsumptionRecord[]>("aviculture_consumption", [])
+  const [vetServices] = useState<VetService[]>(mockVetServices)
 
-  const [feedStock, setFeedStock] = useLocalStorage<FeedItem[]>("avicultureFeedStock", [
-    { type: "Aliment pondeuses", quantity: 500, unit: "kg", costPerUnit: 0.025, lastOrder: "2024-01-15", supplier: "Ferme Moderne" },
-    { type: "Aliment démarrage", quantity: 300, unit: "kg", costPerUnit: 0.018, lastOrder: "2024-01-10", supplier: "Coopérative YELEN" },
-    { type: "Aliment croissance", quantity: 400, unit: "kg", costPerUnit: 0.022, lastOrder: "2024-01-12", supplier: "Ferme Moderne" },
-    { type: "Aliment finition", quantity: 350, unit: "kg", costPerUnit: 0.02, lastOrder: "2024-01-14", supplier: "AgriTech BF" },
-  ])
+  // États UI
+  const [selectedBatch, setSelectedBatch] = useState<PoultryBatch | null>(null)
+  const [showBatchDialog, setShowBatchDialog] = useState(false)
+  const [showHealthDialog, setShowHealthDialog] = useState(false)
+  const [showFeedOrderDialog, setShowFeedOrderDialog] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [editingBatch, setEditingBatch] = useState<PoultryBatch | null>(null)
+  const [editingHealth, setEditingHealth] = useState<HealthRecord | null>(null)
 
-  const [healthRecords, setHealthRecords] = useLocalStorage<HealthRecord[]>("avicultureHealthRecords", [
-    { id: "1", batchId: "batch-1", date: "2024-01-15", type: "vaccination", description: "Vaccin Newcastle", veterinarian: "Dr. Aminata", cost: 0.008 },
-    { id: "2", batchId: "batch-2", date: "2024-01-20", type: "vaccination", description: "Vaccin Gumboro", veterinarian: "Dr. Moussa", cost: 0.006 },
-  ])
-
-  const [productionStats, setProductionStats] = useLocalStorage<ProductionStat[]>("avicultureProductionStats", [
-    { date: "Sem 1", eggs: 580, mortality: 2.1, avgWeight: 1.8, feedConsumption: 45 },
-    { date: "Sem 2", eggs: 620, mortality: 1.9, avgWeight: 1.9, feedConsumption: 47 },
-    { date: "Sem 3", eggs: 650, mortality: 1.8, avgWeight: 2.0, feedConsumption: 48 },
-    { date: "Sem 4", eggs: 670, mortality: 1.7, avgWeight: 2.1, feedConsumption: 50 },
-    { date: "Sem 5", eggs: 690, mortality: 1.6, avgWeight: 2.2, feedConsumption: 52 },
-    { date: "Sem 6", eggs: 710, mortality: 1.5, avgWeight: 2.3, feedConsumption: 53 },
-    { date: "Sem 7", eggs: 730, mortality: 1.4, avgWeight: 2.4, feedConsumption: 55 },
-  ])
-
-  const [services] = useState<Service[]>([
-    { id: "1", provider: "Dr. Aminata Traoré", service: "Consultation vétérinaire", price: 0.008, rating: 4.9, location: "Ouagadougou", available: true, phone: "+226 70 12 34 56", experience: 12 },
-    { id: "2", provider: "Coopérative YELEN", service: "Formation aviculture", price: 0.015, rating: 4.7, location: "Bobo-Dioulasso", available: true, phone: "+226 70 23 45 67", experience: 8 },
-    { id: "3", provider: "TechAgri Solutions", service: "Analyse de données", price: 0.012, rating: 4.8, location: "Koudougou", available: false, phone: "+226 70 34 56 78", experience: 5 },
-    { id: "4", provider: "Ferme Moderne", service: "Alimentation certifiée", price: 0.025, rating: 4.9, location: "Banfora", available: true, phone: "+226 70 45 67 89", experience: 15 },
-  ])
-
-  const [newBatch, setNewBatch] = useState({
-    name: "",
-    type: "pondeuses",
-    birds: 0,
-    age: 0,
+  // Formulaires
+  const [batchForm, setBatchForm] = useState({
+    name: "", breed: "", count: 0, startDate: "", expectedEndDate: "", location: "", notes: "",
   })
-
-  const [healthRecord, setHealthRecord] = useState({
-    batchId: "",
-    type: "vaccination",
-    description: "",
-    veterinarian: "",
-    cost: 0,
+  const [healthForm, setHealthForm] = useState({
+    batchId: "", type: "vaccination", title: "", description: "", product: "", dosage: "", nextDue: "", status: "scheduled",
   })
+  const [feedOrder, setFeedOrder] = useState({ feedId: "", quantity: 0 })
 
-  const selectedBatch = batches.find(b => b.id === selectedBatchId)
+  // Calculs pour l'aperçu
+  const totalBirds = batches.filter(b => b.status === "active").reduce((sum, b) => sum + b.count, 0)
+  const totalMortality = batches.reduce((sum, b) => sum + b.mortality, 0)
+  const totalFeedStock = feedStock.reduce((sum, f) => sum + f.currentStock, 0)
+  const lowStockAlerts = feedStock.filter(f => f.currentStock <= f.threshold)
+  const overdueHealth = healthRecords.filter(h => h.status === "overdue")
+  const averageEggProduction = batches.filter(b => b.eggProduction).reduce((sum, b) => sum + (b.eggProduction || 0), 0)
 
-  // Calculs des statistiques globales
-  const totalBirds = batches.reduce((sum, b) => sum + b.birds, 0)
-  const totalEggs = batches.filter(b => b.type === "pondeuses").reduce((sum, b) => sum + (b.eggs || 0), 0)
-  const avgMortality = batches.reduce((sum, b) => sum + b.mortality, 0) / batches.length
-  const totalFeedValue = feedStock.reduce((sum, f) => sum + (f.quantity * f.costPerUnit), 0)
+  // Fonctions de gestion des lots
+  const handleAddBatch = () => {
+    if (!batchForm.name || !batchForm.breed || batchForm.count <= 0 || !batchForm.startDate) {
+      showToast("Veuillez remplir tous les champs obligatoires", "error")
+      return
+    }
+    const newBatch: PoultryBatch = {
+      id: Date.now().toString(),
+      name: batchForm.name,
+      breed: batchForm.breed,
+      count: batchForm.count,
+      initialCount: batchForm.count,
+      startDate: batchForm.startDate,
+      expectedEndDate: batchForm.expectedEndDate,
+      location: batchForm.location,
+      status: "active",
+      notes: batchForm.notes,
+      mortality: 0,
+      feedConsumption: 0,
+    }
+    setBatches([newBatch, ...batches])
+    setShowBatchDialog(false)
+    setBatchForm({ name: "", breed: "", count: 0, startDate: "", expectedEndDate: "", location: "", notes: "" })
+    showToast("Lot ajouté avec succès", "success")
+  }
 
-  const refreshData = useCallback(async () => {
+  const handleUpdateBatch = () => {
+    if (!editingBatch) return
+    setBatches(batches.map(b => b.id === editingBatch.id ? editingBatch : b))
+    setEditingBatch(null)
+    showToast("Lot mis à jour", "success")
+  }
+
+  const handleDeleteBatch = (id: string) => {
+    if (confirm("Supprimer ce lot ?")) {
+      setBatches(batches.filter(b => b.id !== id))
+      showToast("Lot supprimé", "info")
+    }
+  }
+
+  const handleAddHealthRecord = () => {
+    if (!healthForm.batchId || !healthForm.title) {
+      showToast("Veuillez remplir les champs obligatoires", "error")
+      return
+    }
+    const newRecord: HealthRecord = {
+      id: Date.now().toString(),
+      batchId: healthForm.batchId,
+      date: new Date().toISOString().split("T")[0],
+      type: healthForm.type as any,
+      title: healthForm.title,
+      description: healthForm.description,
+      product: healthForm.product,
+      dosage: healthForm.dosage,
+      nextDue: healthForm.nextDue,
+      status: healthForm.status as any,
+    }
+    setHealthRecords([newRecord, ...healthRecords])
+    setShowHealthDialog(false)
+    setHealthForm({ batchId: "", type: "vaccination", title: "", description: "", product: "", dosage: "", nextDue: "", status: "scheduled" })
+    showToast("Enregistrement santé ajouté", "success")
+  }
+
+  // Achat d'aliment (paiement Pi)
+  const handleOrderFeed = async () => {
+    const feed = feedStock.find(f => f.id === feedOrder.feedId)
+    if (!feed || feedOrder.quantity <= 0) {
+      showToast("Sélectionnez un aliment et une quantité valide", "error")
+      return
+    }
     if (!isOnline) {
       showToast("Connexion internet requise", "error")
       return
     }
-    setIsRefreshing(true)
+    if (!isAuthenticated) {
+      showToast("Veuillez vous connecter avec Pi Network", "error")
+      return
+    }
+    if (!isPiSDKAvailable()) {
+      showToast("Ouvrez cette application dans Pi Browser", "error")
+      return
+    }
+
+    const totalPrice = feed.pricePerUnit * feedOrder.quantity
+    setIsProcessing(true)
     try {
-      await new Promise(resolve => setTimeout(resolve, 800))
-      showToast("Données actualisées", "success")
-    } catch {
-      showToast("Erreur lors de l'actualisation", "error")
+      const payment = await createPiPayment(totalPrice, `Achat aliment: ${feed.name} x${feedOrder.quantity}kg`)
+      if (payment.identifier) {
+        // Mettre à jour le stock
+        setFeedStock(feedStock.map(f => f.id === feed.id ? { ...f, currentStock: f.currentStock + feedOrder.quantity } : f))
+        // Enregistrer la consommation
+        const consumption: FeedConsumptionRecord = {
+          id: Date.now().toString(),
+          batchId: "stock",
+          date: new Date().toISOString().split("T")[0],
+          amount: feedOrder.quantity,
+          feedType: feed.name,
+        }
+        setFeedConsumptions([consumption, ...feedConsumptions])
+        showToast(`Commande réussie ! ${totalPrice} π débité`, "success")
+        setShowFeedOrderDialog(false)
+        setFeedOrder({ feedId: "", quantity: 0 })
+      }
+    } catch (error: any) {
+      showToast(error.message || "Erreur lors du paiement", "error")
     } finally {
-      setIsRefreshing(false)
+      setIsProcessing(false)
     }
-  }, [isOnline])
+  }
 
-  const handleAddBatch = () => {
-    if (!newBatch.name || newBatch.birds <= 0) {
-      showToast("Veuillez remplir tous les champs", "error")
+  // Réservation service vétérinaire
+  const handleBookVetService = async (service: VetService) => {
+    if (!isOnline || !isAuthenticated || !isPiSDKAvailable()) {
+      showToast("Conditions non remplies (connexion, Pi Browser)", "error")
       return
     }
-    const batch: Batch = {
-      id: `batch-${Date.now()}`,
-      name: newBatch.name,
-      type: newBatch.type as any,
-      birds: newBatch.birds,
-      age: newBatch.age,
-      health: "bon",
-      mortality: 0,
-      createdAt: new Date().toISOString().split("T")[0],
-    }
-    setBatches([...batches, batch])
-    setShowBatchModal(false)
-    setNewBatch({ name: "", type: "pondeuses", birds: 0, age: 0 })
-    showToast("Lot ajouté avec succès", "success")
-  }
-
-  const handleDeleteBatch = (id: string) => {
-    setBatches(batches.filter(b => b.id !== id))
-    showToast("Lot supprimé", "success")
-  }
-
-  const handleAddHealthRecord = () => {
-    if (!healthRecord.batchId || !healthRecord.description) {
-      showToast("Veuillez remplir tous les champs", "error")
-      return
-    }
-    const record: HealthRecord = {
-      id: `hr-${Date.now()}`,
-      batchId: healthRecord.batchId,
-      date: new Date().toISOString().split("T")[0],
-      type: healthRecord.type as any,
-      description: healthRecord.description,
-      veterinarian: healthRecord.veterinarian,
-      cost: healthRecord.cost,
-    }
-    setHealthRecords([...healthRecords, record])
-    setShowHealthModal(false)
-    setHealthRecord({ batchId: "", type: "vaccination", description: "", veterinarian: "", cost: 0 })
-    showToast("Suivi santé ajouté", "success")
-  }
-
-  const getHealthColor = (health: string) => {
-    switch (health) {
-      case "bon": return "text-green-600 bg-green-100"
-      case "moyen": return "text-yellow-600 bg-yellow-100"
-      case "critique": return "text-red-600 bg-red-100"
-      default: return "text-gray-600 bg-gray-100"
+    setIsProcessing(true)
+    try {
+      const payment = await createPiPayment(service.price, `Service vétérinaire: ${service.name}`)
+      if (payment.identifier) {
+        showToast(`Service réservé ! ${service.price} π débité`, "success")
+        // Ici vous pourriez enregistrer le rendez-vous dans localStorage
+      }
+    } catch (error: any) {
+      showToast(error.message, "error")
+    } finally {
+      setIsProcessing(false)
     }
   }
-
-  const getBatchTypeLabel = (type: string) => {
-    switch (type) {
-      case "pondeuses": return "🥚 Pondeuses"
-      case "poulets": return "🍗 Poulets de chair"
-      case "reproducteurs": return "🐓 Reproducteurs"
-      default: return type
-    }
-  }
-
-  const filteredServices = services.filter(s => 
-    s.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.provider.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  // Composant graphique simplifié
-  const ProductionChart = () => (
-    <div className="flex items-end gap-2 h-40 mt-4">
-      {productionStats.map((stat, i) => (
-        <div key={i} className="flex-1 flex flex-col items-center gap-1">
-          <div className="w-full bg-green-500 rounded-t-lg transition-all hover:bg-green-600" style={{ height: `${(stat.eggs / 800) * 100}px` }} />
-          <span className="text-xs text-gray-500">{stat.date}</span>
-          <span className="text-[10px] font-medium">{stat.eggs}</span>
-        </div>
-      ))}
-    </div>
-  )
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
+    <div className="space-y-6">
+      {/* En-tête */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold">🐔 Gestion Aviculture</h2>
-          <p className="text-gray-500 text-sm">Outils complets pour votre élevage - {userRegion}</p>
+          <h2 className="text-2xl font-bold">🐔 Gestion Avicole</h2>
+          <p className="text-gray-500 text-sm">Gérez vos élevages de volailles - {userRegion}</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {!isOnline && <Badge className="bg-yellow-500 text-white gap-1"><WifiOff className="h-3 w-3" />Hors ligne</Badge>}
-          <Button variant="outline" size="sm" onClick={refreshData} disabled={isRefreshing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-            Actualiser
+        <div className="flex gap-2">
+          <Button onClick={() => { setEditingBatch(null); setBatchForm({ name: "", breed: "", count: 0, startDate: "", expectedEndDate: "", location: "", notes: "" }); setShowBatchDialog(true) }} className="bg-green-600 hover:bg-green-700">
+            <Plus className="h-4 w-4 mr-2" /> Nouveau lot
           </Button>
-          <Button size="sm" className="bg-green-600 hover:bg-green-700 gap-1" onClick={() => setShowBatchModal(true)}>
-            <Plus className="h-4 w-4" /> Nouveau lot
-          </Button>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input placeholder="Rechercher..." className="pl-9 w-48 sm:w-64" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-          </div>
         </div>
       </div>
 
-      {/* Cartes de statistiques globales */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><div className="flex justify-between items-start"><div><p className="text-sm text-gray-500">Volailles totales</p><p className="text-2xl font-bold">{formatNumber(totalBirds)}</p></div><Users className="h-8 w-8 text-blue-500 opacity-50" /></div><Badge className="mt-2 bg-green-100 text-green-700">+8%</Badge></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="flex justify-between items-start"><div><p className="text-sm text-gray-500">Production œufs/jour</p><p className="text-2xl font-bold">{formatNumber(totalEggs)}</p></div><Egg className="h-8 w-8 text-yellow-500 opacity-50" /></div><Badge className="mt-2 bg-green-100 text-green-700">+5%</Badge></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="flex justify-between items-start"><div><p className="text-sm text-gray-500">Mortalité moyenne</p><p className="text-2xl font-bold">{avgMortality.toFixed(1)}%</p></div><Activity className="h-8 w-8 text-red-500 opacity-50" /></div><Badge className="mt-2 bg-green-100 text-green-700">-0.3%</Badge></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="flex justify-between items-start"><div><p className="text-sm text-gray-500">Valeur stock aliments</p><p className="text-2xl font-bold text-purple-600">{totalFeedValue.toFixed(4)} π</p></div><Package className="h-8 w-8 text-purple-500 opacity-50" /></div></CardContent></Card>
-      </div>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid grid-cols-5 gap-2">
+          <TabsTrigger value="overview">Aperçu</TabsTrigger>
+          <TabsTrigger value="batches">Mes lots</TabsTrigger>
+          <TabsTrigger value="health">Santé</TabsTrigger>
+          <TabsTrigger value="feeding">Alimentation</TabsTrigger>
+          <TabsTrigger value="services">Services</TabsTrigger>
+        </TabsList>
 
-      {/* Onglets principaux */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        {["overview", "batches", "health", "feeding", "services"].map(tab => (
-          <Button key={tab} variant={activeTab === tab ? "default" : "outline"} onClick={() => setActiveTab(tab)} className={activeTab === tab ? "bg-green-600" : ""}>
-            {tab === "overview" && <BarChart3 className="h-4 w-4 mr-2" />}
-            {tab === "batches" && <Users className="h-4 w-4 mr-2" />}
-            {tab === "health" && <Heart className="h-4 w-4 mr-2" />}
-            {tab === "feeding" && <Utensils className="h-4 w-4 mr-2" />}
-            {tab === "services" && <ShoppingCart className="h-4 w-4 mr-2" />}
-            {tab === "overview" && "Aperçu"}
-            {tab === "batches" && "Mes lots"}
-            {tab === "health" && "Santé"}
-            {tab === "feeding" && "Alimentation"}
-            {tab === "services" && "Services"}
-          </Button>
-        ))}
-      </div>
-
-      {/* Onglet Aperçu */}
-      {activeTab === "overview" && (
-        <div className="space-y-6">
-          <Card><CardHeader><CardTitle className="flex items-center gap-2"><LineChart className="h-5 w-5" />Production hebdomadaire</CardTitle></CardHeader><CardContent><ProductionChart /></CardContent></Card>
-          
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card><CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5" />Alertes récentes</CardTitle></CardHeader><CardContent><div className="space-y-3">{[
-              { message: "Vaccination prévue pour le lot A", type: "warning" },
-              { message: "Stock d'aliment pondeuses faible", type: "warning" },
-              { message: "Contrôle sanitaire OK", type: "success" },
-            ].map((a, i) => (<div key={i} className={`p-3 rounded-lg ${a.type === "warning" ? "bg-yellow-50 border-l-4 border-yellow-500" : "bg-green-50 border-l-4 border-green-500"}`}><p className="text-sm">{a.message}</p></div>))}</div></CardContent></Card>
-
-            <Card><CardHeader><CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5" />Vaccinations à venir</CardTitle></CardHeader><CardContent><div className="space-y-3">{batches.filter(b => b.nextVaccination).map(batch => (<div key={batch.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"><div><p className="font-medium">{batch.name}</p><p className="text-xs text-gray-500">Prochaine: {batch.nextVaccination}</p></div><Badge className="bg-yellow-100 text-yellow-700">À venir</Badge></div>))}</div></CardContent></Card>
+        {/* ==================== APERÇU ==================== */}
+        <TabsContent value="overview" className="space-y-4 mt-6">
+          {/* Cartes KPI */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card><CardContent className="p-3 text-center"><Users className="h-5 w-5 text-blue-600 mx-auto mb-1" /><p className="text-2xl font-bold">{totalBirds}</p><p className="text-xs text-gray-500">Volailles actives</p></CardContent></Card>
+            <Card><CardContent className="p-3 text-center"><TrendingDown className="h-5 w-5 text-red-500 mx-auto mb-1" /><p className="text-2xl font-bold">{totalMortality}</p><p className="text-xs text-gray-500">Mortalité totale</p></CardContent></Card>
+            <Card><CardContent className="p-3 text-center"><Package className="h-5 w-5 text-orange-500 mx-auto mb-1" /><p className="text-2xl font-bold">{totalFeedStock} kg</p><p className="text-xs text-gray-500">Stock alimentaire</p></CardContent></Card>
+            <Card><CardContent className="p-3 text-center"><Egg className="h-5 w-5 text-yellow-500 mx-auto mb-1" /><p className="text-2xl font-bold">{averageEggProduction}</p><p className="text-xs text-gray-500">Œufs/jour</p></CardContent></Card>
           </div>
 
-          <Card><CardHeader><CardTitle className="flex items-center gap-2"><Star className="h-5 w-5" />Services recommandés</CardTitle></CardHeader><CardContent><div className="grid grid-cols-1 md:grid-cols-3 gap-3">{services.filter(s => s.available).slice(0, 3).map(s => (<div key={s.id} className="flex justify-between items-center p-3 border rounded-lg"><div><p className="font-medium text-sm">{s.service}</p><p className="text-xs text-gray-500">{s.provider}</p><div className="flex items-center gap-1 mt-1"><Star className="h-3 w-3 text-yellow-500 fill-current" /><span className="text-xs">{s.rating}</span></div></div><div className="text-right"><p className="font-bold text-purple-600">{s.price} π</p><Button size="sm" className="mt-1 text-xs h-7">Réserver</Button></div></div>))}</div></CardContent></Card>
-        </div>
-      )}
-
-      {/* Onglet Mes lots */}
-      {activeTab === "batches" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {batches.map(batch => (
-            <Card key={batch.id} className="hover:shadow-md transition-all">
-              <CardHeader className="pb-2"><div className="flex justify-between items-start"><CardTitle className="text-lg">{batch.name}</CardTitle><div className="flex gap-1"><Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => { setEditingBatch(batch); setShowBatchModal(true); }}><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => handleDeleteBatch(batch.id)}><Trash2 className="h-4 w-4" /></Button></div></div><p className="text-sm text-gray-500">{getBatchTypeLabel(batch.type)}</p></CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-2 bg-gray-50 rounded"><p className="text-xs text-gray-500">Effectif</p><p className="text-lg font-bold">{formatNumber(batch.birds)}</p></div>
-                  <div className="p-2 bg-gray-50 rounded"><p className="text-xs text-gray-500">Âge</p><p className="text-lg font-bold">{batch.age} sem</p></div>
-                  {batch.type === "pondeuses" && (<div className="p-2 bg-gray-50 rounded"><p className="text-xs text-gray-500">Production/jour</p><p className="text-lg font-bold">{formatNumber(batch.eggs || 0)}</p></div>)}
-                  {batch.type === "poulets" && (<div className="p-2 bg-gray-50 rounded"><p className="text-xs text-gray-500">Poids moyen</p><p className="text-lg font-bold">{batch.weight || 1.2} kg</p></div>)}
-                  <div className="p-2 bg-gray-50 rounded"><p className="text-xs text-gray-500">Mortalité</p><p className="text-lg font-bold text-red-600">{batch.mortality}%</p></div>
-                </div>
-                <div className="flex justify-between items-center"><span className="text-sm">État sanitaire</span><Badge className={getHealthColor(batch.health)}>{batch.health === "bon" ? "✅ Bon" : batch.health === "moyen" ? "⚠️ Moyen" : "🔴 Critique"}</Badge></div>
-                <Progress value={100 - batch.mortality} className="h-2" />
-                <div className="flex justify-between text-xs text-gray-400"><span>Créé le {batch.createdAt}</span>{batch.lastVaccination && <span>Dernière vaccination: {batch.lastVaccination}</span>}</div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Onglet Santé */}
-      {activeTab === "health" && (
-        <div className="space-y-6">
-          <div className="flex justify-end"><Button size="sm" onClick={() => setShowHealthModal(true)} className="gap-1"><Plus className="h-4 w-4" />Ajouter un suivi</Button></div>
-          <div className="space-y-3">
-            {healthRecords.map(record => {
-              const batch = batches.find(b => b.id === record.batchId)
-              return (<div key={record.id} className="flex justify-between items-center p-4 border rounded-lg"><div><div className="flex items-center gap-2"><Badge className={record.type === "vaccination" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}>{record.type === "vaccination" ? "💉 Vaccination" : "🏥 Consultation"}</Badge><span className="text-sm text-gray-500">{record.date}</span></div><p className="font-medium mt-1">{record.description}</p><p className="text-sm text-gray-500">Lot: {batch?.name || "Inconnu"} • {record.veterinarian && `Dr. ${record.veterinarian}`}</p></div><div className="text-right"><p className="font-bold text-purple-600">{record.cost} π</p></div></div>)
-            })}
-            {healthRecords.length === 0 && <div className="text-center py-8 text-gray-400"><Heart className="h-12 w-12 mx-auto mb-3 opacity-50" /><p>Aucun suivi santé</p></div>}
-          </div>
-        </div>
-      )}
-
-      {/* Onglet Alimentation */}
-      {activeTab === "feeding" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card><CardHeader><CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" />Stock d'aliments</CardTitle></CardHeader><CardContent><div className="space-y-3">{feedStock.map((feed, i) => (<div key={i} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"><div><p className="font-medium">{feed.type}</p><p className="text-xs text-gray-500">{feed.supplier}</p></div><div className="text-right"><p className="font-medium">{feed.quantity} {feed.unit}</p><p className="text-sm text-purple-600">{feed.costPerUnit} π/{feed.unit}</p><p className="text-xs text-gray-400">Dernière commande: {feed.lastOrder}</p></div></div>))}</div></CardContent></Card>
-
-            <Card><CardHeader><CardTitle className="flex items-center gap-2"><Tractor className="h-5 w-5" />Calculateur d'aliments</CardTitle></CardHeader><CardContent><div className="space-y-4"><div><label className="text-sm font-medium">Nombre de volailles</label><Input placeholder="Ex: 1000" /></div><div><label className="text-sm font-medium">Âge (semaines)</label><Input placeholder="Ex: 18" /></div><div><label className="text-sm font-medium">Type d'élevage</label><select className="w-full p-2 border rounded"><option>Pondeuses</option><option>Poulets de chair</option><option>Reproducteurs</option></select></div><Button className="w-full bg-purple-600 hover:bg-purple-700">Calculer les besoins (≈ 2.5 kg/jour)</Button></div></CardContent></Card>
-          </div>
-        </div>
-      )}
-
-      {/* Onglet Services */}
-      {activeTab === "services" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredServices.map(service => (
-            <Card key={service.id} className="hover:shadow-md transition-all">
+          {/* Alertes */}
+          {(lowStockAlerts.length > 0 || overdueHealth.length > 0) && (
+            <Card className="border-yellow-200 bg-yellow-50">
               <CardContent className="p-4">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-2"><div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">{service.provider.charAt(0)}</div><div><p className="font-medium text-sm">{service.provider}</p><div className="flex items-center gap-1"><Star className="h-3 w-3 text-yellow-500 fill-current" /><span className="text-xs">{service.rating}</span><span className="text-xs text-gray-400">• {service.experience} ans</span></div></div></div>
-                  <Badge className={service.available ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}>{service.available ? "Disponible" : "Occupé"}</Badge>
+                <div className="flex items-center gap-2 text-yellow-700 mb-2"><AlertTriangle className="h-5 w-5" />Alertes importantes</div>
+                <div className="space-y-1 text-sm">
+                  {lowStockAlerts.map(f => <div key={f.id}>⚠️ Stock faible : {f.name} ({f.currentStock} kg)</div>)}
+                  {overdueHealth.map(h => <div key={h.id}>⚠️ {h.title} en retard depuis le {h.nextDue}</div>)}
                 </div>
-                <h4 className="font-semibold text-sm mb-2">{service.service}</h4>
-                <div className="flex justify-between items-center text-sm mb-3"><div className="flex items-center gap-1 text-gray-500"><MapPin className="h-3 w-3" /><span>{service.location}</span></div><span className="font-bold text-purple-600">{service.price} π</span></div>
-                {service.phone && <p className="text-xs text-gray-400 mb-2">📞 {service.phone}</p>}
-                <Button className="w-full" size="sm" disabled={!service.available} onClick={() => showToast(`Réservation de ${service.service} envoyée`, "success")}>{service.available ? "Réserver" : "Non disponible"}</Button>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          )}
 
-      {/* Modal ajout lot */}
-      <Dialog open={showBatchModal} onOpenChange={setShowBatchModal}>
-        <DialogContent className="max-w-md">
+          {/* Derniers lots */}
+          <Card><CardHeader><CardTitle>Derniers lots actifs</CardTitle></CardHeader><CardContent><div className="space-y-2">{batches.filter(b=>b.status==="active").slice(0,3).map(b=>(
+            <div key={b.id} className="flex justify-between items-center p-2 border rounded"><div><p className="font-medium">{b.name}</p><p className="text-xs text-gray-500">{b.breed} • {b.count} sujets</p></div><Badge>{b.location}</Badge></div>
+          ))}</div></CardContent></Card>
+        </TabsContent>
+
+        {/* ==================== MES LOTS ==================== */}
+        <TabsContent value="batches" className="space-y-4 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {batches.map(batch => (
+              <Card key={batch.id} className="relative">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold">{batch.name}</h3>
+                      <p className="text-xs text-gray-500">{batch.breed} • {batch.location}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setEditingBatch(batch); setShowBatchDialog(true) }}><Edit className="h-3 w-3" /></Button>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500" onClick={() => handleDeleteBatch(batch.id)}><Trash2 className="h-3 w-3" /></Button>
+                    </div>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                    <div><span className="text-gray-500">Effectif:</span> {batch.count}</div>
+                    <div><span className="text-gray-500">Début:</span> {batch.startDate}</div>
+                    <div><span className="text-gray-500">Mortalité:</span> {batch.mortality}</div>
+                    {batch.weight && <div><span className="text-gray-500">Poids moy.:</span> {batch.weight} kg</div>}
+                    {batch.eggProduction && <div><span className="text-gray-500">Ponte/jour:</span> {batch.eggProduction}</div>}
+                  </div>
+                  <Progress value={(batch.count / batch.initialCount) * 100} className="mt-3 h-1" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* ==================== SANTÉ ==================== */}
+        <TabsContent value="health" className="space-y-4 mt-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold">Suivi sanitaire</h3>
+            <Button size="sm" onClick={() => { setEditingHealth(null); setHealthForm({ batchId: batches[0]?.id || "", type: "vaccination", title: "", description: "", product: "", dosage: "", nextDue: "", status: "scheduled" }); setShowHealthDialog(true) }}><Plus className="h-4 w-4 mr-1" />Ajouter un suivi</Button>
+          </div>
+          <div className="space-y-3">
+            {healthRecords.map(rec => (
+              <Card key={rec.id}>
+                <CardContent className="p-4">
+                  <div className="flex justify-between">
+                    <div><p className="font-medium">{rec.title}</p><p className="text-xs text-gray-500">{rec.type} • {rec.date}</p></div>
+                    <Badge variant={rec.status === "done" ? "default" : rec.status === "scheduled" ? "secondary" : "destructive"}>{rec.status === "done" ? "Effectué" : rec.status === "scheduled" ? "Planifié" : "En retard"}</Badge>
+                  </div>
+                  {rec.description && <p className="text-sm mt-1">{rec.description}</p>}
+                  {rec.product && <p className="text-xs text-gray-500">Produit: {rec.product} - {rec.dosage}</p>}
+                  {rec.nextDue && <p className="text-xs text-blue-600 mt-1">Prochain: {rec.nextDue}</p>}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* ==================== ALIMENTATION ==================== */}
+        <TabsContent value="feeding" className="space-y-4 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {feedStock.map(feed => (
+              <Card key={feed.id}>
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-center">
+                    <div><h3 className="font-semibold">{feed.name}</h3><p className="text-xs text-gray-500">Fournisseur: {feed.supplier}</p></div>
+                    <Badge variant={feed.currentStock <= feed.threshold ? "destructive" : "default"}>{feed.currentStock} kg</Badge>
+                  </div>
+                  <Progress value={(feed.currentStock / 2000) * 100} className="my-2 h-1" />
+                  <div className="flex justify-between text-sm">
+                    <span>{feed.pricePerUnit} π/kg</span>
+                    <Button size="sm" variant="outline" onClick={() => { setFeedOrder({ feedId: feed.id, quantity: 0 }); setShowFeedOrderDialog(true) }}><ShoppingCart className="h-3 w-3 mr-1" /> Commander</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* ==================== SERVICES ==================== */}
+        <TabsContent value="services" className="space-y-4 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {vetServices.map(service => (
+              <Card key={service.id}>
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start">
+                    <div><h3 className="font-semibold">{service.name}</h3><p className="text-xs text-gray-500">{service.provider} • {service.location}</p><div className="flex items-center gap-1 mt-1"><Heart className="h-3 w-3 text-red-500" /> {service.rating}</div></div>
+                    <Badge>{service.price} π</Badge>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">{service.description}</p>
+                  <div className="flex justify-between items-center mt-3">
+                    <span className="text-xs text-gray-400"><Clock className="h-3 w-3 inline mr-1" />{service.duration}</span>
+                    <Button size="sm" className="bg-purple-600" disabled={isProcessing} onClick={() => handleBookVetService(service)}>{isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : "Réserver"}</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Dialog Ajout/Modification Lot */}
+      <Dialog open={showBatchDialog} onOpenChange={setShowBatchDialog}>
+        <DialogContent>
           <DialogHeader><DialogTitle>{editingBatch ? "Modifier le lot" : "Nouveau lot"}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div><Label>Nom du lot</Label><Input value={newBatch.name} onChange={e => setNewBatch({ ...newBatch, name: e.target.value })} placeholder="Lot pondeuses A" /></div>
-            <div><Label>Type</Label><select className="w-full p-2 border rounded" value={newBatch.type} onChange={e => setNewBatch({ ...newBatch, type: e.target.value as any })}><option value="pondeuses">Pondeuses</option><option value="poulets">Poulets de chair</option><option value="reproducteurs">Reproducteurs</option></select></div>
-            <div><Label>Nombre de volailles</Label><Input type="number" value={newBatch.birds} onChange={e => setNewBatch({ ...newBatch, birds: parseInt(e.target.value) || 0 })} /></div>
-            <div><Label>Âge (semaines)</Label><Input type="number" value={newBatch.age} onChange={e => setNewBatch({ ...newBatch, age: parseInt(e.target.value) || 0 })} /></div>
-            <Button onClick={handleAddBatch} className="w-full bg-green-600">{editingBatch ? "Modifier" : "Créer"}</Button>
+          <div className="space-y-3">
+            <div><Label>Nom du lot *</Label><Input value={editingBatch ? editingBatch.name : batchForm.name} onChange={(e) => editingBatch ? setEditingBatch({...editingBatch, name: e.target.value}) : setBatchForm({...batchForm, name: e.target.value})} /></div>
+            <div><Label>Race *</Label><Input value={editingBatch ? editingBatch.breed : batchForm.breed} onChange={(e) => editingBatch ? setEditingBatch({...editingBatch, breed: e.target.value}) : setBatchForm({...batchForm, breed: e.target.value})} /></div>
+            <div><Label>Nombre de sujets *</Label><Input type="number" value={editingBatch ? editingBatch.count : batchForm.count} onChange={(e) => editingBatch ? setEditingBatch({...editingBatch, count: Number(e.target.value)}) : setBatchForm({...batchForm, count: Number(e.target.value)})} /></div>
+            <div><Label>Date de début *</Label><Input type="date" value={editingBatch ? editingBatch.startDate : batchForm.startDate} onChange={(e) => editingBatch ? setEditingBatch({...editingBatch, startDate: e.target.value}) : setBatchForm({...batchForm, startDate: e.target.value})} /></div>
+            <div><Label>Emplacement</Label><Input value={editingBatch ? editingBatch.location : batchForm.location} onChange={(e) => editingBatch ? setEditingBatch({...editingBatch, location: e.target.value}) : setBatchForm({...batchForm, location: e.target.value})} /></div>
+            <div><Label>Notes</Label><Textarea value={editingBatch ? editingBatch.notes : batchForm.notes} onChange={(e) => editingBatch ? setEditingBatch({...editingBatch, notes: e.target.value}) : setBatchForm({...batchForm, notes: e.target.value})} /></div>
+            <Button onClick={editingBatch ? handleUpdateBatch : handleAddBatch} className="w-full">{editingBatch ? "Mettre à jour" : "Créer le lot"}</Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Modal suivi santé */}
-      <Dialog open={showHealthModal} onOpenChange={setShowHealthModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Ajouter un suivi santé</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div><Label>Lot</Label><select className="w-full p-2 border rounded" value={healthRecord.batchId} onChange={e => setHealthRecord({ ...healthRecord, batchId: e.target.value })}><option value="">Sélectionner un lot</option>{batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
-            <div><Label>Type</Label><select className="w-full p-2 border rounded" value={healthRecord.type} onChange={e => setHealthRecord({ ...healthRecord, type: e.target.value as any })}><option value="vaccination">Vaccination</option><option value="checkup">Consultation</option><option value="treatment">Traitement</option></select></div>
-            <div><Label>Description</Label><Input value={healthRecord.description} onChange={e => setHealthRecord({ ...healthRecord, description: e.target.value })} placeholder="Vaccin Newcastle" /></div>
-            <div><Label>Vétérinaire</Label><Input value={healthRecord.veterinarian} onChange={e => setHealthRecord({ ...healthRecord, veterinarian: e.target.value })} placeholder="Dr. Nom" /></div>
-            <div><Label>Coût (π)</Label><Input type="number" step="0.001" value={healthRecord.cost} onChange={e => setHealthRecord({ ...healthRecord, cost: parseFloat(e.target.value) || 0 })} /></div>
-            <Button onClick={handleAddHealthRecord} className="w-full bg-green-600">Ajouter</Button>
+      {/* Dialog Santé */}
+      <Dialog open={showHealthDialog} onOpenChange={setShowHealthDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Ajouter un suivi sanitaire</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Lot concerné</Label><select className="w-full border rounded p-2" value={healthForm.batchId} onChange={(e) => setHealthForm({...healthForm, batchId: e.target.value})}>{batches.map(b=> <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
+            <div><Label>Type</Label><select className="w-full border rounded p-2" value={healthForm.type} onChange={(e) => setHealthForm({...healthForm, type: e.target.value as any})}><option value="vaccination">Vaccination</option><option value="treatment">Traitement</option><option value="checkup">Contrôle</option><option value="alert">Alerte</option></select></div>
+            <div><Label>Titre *</Label><Input value={healthForm.title} onChange={(e) => setHealthForm({...healthForm, title: e.target.value})} /></div>
+            <div><Label>Description</Label><Textarea value={healthForm.description} onChange={(e) => setHealthForm({...healthForm, description: e.target.value})} /></div>
+            <div><Label>Produit / Médicament</Label><Input value={healthForm.product} onChange={(e) => setHealthForm({...healthForm, product: e.target.value})} /></div>
+            <div><Label>Prochaine échéance</Label><Input type="date" value={healthForm.nextDue} onChange={(e) => setHealthForm({...healthForm, nextDue: e.target.value})} /></div>
+            <Button onClick={handleAddHealthRecord}>Enregistrer</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Commande aliment */}
+      <Dialog open={showFeedOrderDialog} onOpenChange={setShowFeedOrderDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Commander un aliment</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Aliment</Label><select className="w-full border rounded p-2" value={feedOrder.feedId} onChange={(e) => setFeedOrder({...feedOrder, feedId: e.target.value})}>{feedStock.map(f=> <option key={f.id} value={f.id}>{f.name} ({f.pricePerUnit} π/kg)</option>)}</select></div>
+            <div><Label>Quantité (kg) *</Label><Input type="number" step="10" value={feedOrder.quantity} onChange={(e) => setFeedOrder({...feedOrder, quantity: Number(e.target.value)})} /></div>
+            <Button onClick={handleOrderFeed} disabled={isProcessing}>{isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Payer avec Pi"}</Button>
           </div>
         </DialogContent>
       </Dialog>
     </div>
   )
 }
-
-// Composant Label manquant
-const Label = ({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) => (
-  <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1">{children}</label>
-)
