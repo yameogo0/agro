@@ -34,6 +34,7 @@ import {
   AlertCircle,
   Shield,
   Sun,
+  Crown,
 } from "lucide-react"
 
 import Dashboard from "@/components/dashboard"
@@ -45,6 +46,7 @@ import MessagingSystem from "@/components/messaging-system"
 import ServiceManagement from "@/components/service-management"
 import RegionalAdaptation from "@/components/regional-adaptation"
 import GeolocationManager from "@/components/geolocation-manager"
+import SubscriptionPage from "@/components/subscription/SubscriptionPage"
 import { LanguageSelector } from "@/components/LanguageSelector"
 import { usePiAuth } from "@/contexts/pi-auth-context"
 import { useOnlineStatus } from "@/hooks/use-online-status"
@@ -52,8 +54,9 @@ import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useGeolocation } from "@/hooks/use-geolocation"
 import { showToast } from "@/lib/utils"
 import { initPiSDK } from "@/lib/pi-payments"
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext"
 
-export default function AgroMulticenterApp() {
+function AppContent() {
   const { isAuthenticated, isLoading, login, userData, error } = usePiAuth()
   const isOnline = useOnlineStatus()
 
@@ -167,6 +170,7 @@ export default function AgroMulticenterApp() {
     }, 1500)
   }
 
+  // ✅ Navigation avec onglet Abonnement ajouté
   const navigationItems = [
     { id: "home", label: "Accueil", icon: Home, color: "text-green-500", bg: "bg-green-50" },
     { id: "aviculture", label: "Aviculture", icon: Users, color: "text-blue-500", bg: "bg-blue-50" },
@@ -176,6 +180,7 @@ export default function AgroMulticenterApp() {
     { id: "profile", label: "Profil", icon: User, color: "text-orange-500", bg: "bg-orange-50" },
     { id: "regional", label: "Régions", icon: Globe, color: "text-emerald-500", bg: "bg-emerald-50" },
     { id: "geolocation", label: "Géolocalisation", icon: MapPin, color: "text-indigo-500", bg: "bg-indigo-50" },
+    { id: "subscription", label: "Abonnement", icon: Crown, color: "text-yellow-500", bg: "bg-yellow-50" },
     { id: "settings", label: "Paramètres", icon: Settings, color: "text-gray-500", bg: "bg-gray-50" },
   ]
 
@@ -379,12 +384,13 @@ export default function AgroMulticenterApp() {
               <div className="space-y-6">
                 {activeTab === "home" && <Dashboard currentLanguage={currentLanguage} userRegion={gpsAddress || userRegion} onTabChange={setActiveTab} />}
                 {activeTab === "aviculture" && <AvicultureManagement currentLanguage={currentLanguage} userRegion={gpsAddress || userRegion} />}
-                {activeTab === "services" && <ServiceManagement currentLanguage={currentLanguage} userRegion={gpsAddress || userRegion} />}
+                {activeTab === "services" && <ServiceManagement currentLanguage={currentLanguage} userRegion={gpsAddress || userRegion} onTabChange={setActiveTab} />}
                 {activeTab === "messages" && <MessagingSystem currentLanguage={currentLanguage} userRegion={gpsAddress || userRegion} />}
                 {activeTab === "wallet" && <PiWalletIntegration currentLanguage={currentLanguage} userRegion={gpsAddress || userRegion} />}
                 {activeTab === "profile" && <UserProfile currentLanguage={currentLanguage} userRegion={gpsAddress || userRegion} />}
                 {activeTab === "regional" && <RegionalAdaptation currentLanguage={currentLanguage} userRegion={userRegion} onRegionChange={setUserRegion} />}
                 {activeTab === "geolocation" && <GeolocationManager currentLanguage={currentLanguage} userRegion={gpsAddress || userRegion} />}
+                {activeTab === "subscription" && <SubscriptionPage />}
                 {activeTab === "settings" && (
                   <Card>
                     <CardHeader><CardTitle>Paramètres</CardTitle></CardHeader>
@@ -402,5 +408,14 @@ export default function AgroMulticenterApp() {
         <MobileNavigation activeTab={activeTab} onTabChange={setActiveTab} onMenuToggle={() => setIsMenuOpen(!isMenuOpen)} unreadCount={unreadMessages} notificationCount={notificationCount} currentLanguage={currentLanguage} />
       </div>
     </div>
+  )
+}
+
+// Composant principal avec SubscriptionProvider
+export default function AgroMulticenterApp() {
+  return (
+    <SubscriptionProvider>
+      <AppContent />
+    </SubscriptionProvider>
   )
 }
