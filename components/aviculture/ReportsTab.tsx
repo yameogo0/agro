@@ -1,4 +1,4 @@
-// components/aviculture/ReportsTab.tsx
+/// components/aviculture/ReportsTab.tsx
 
 "use client"
 
@@ -11,8 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, FileText, Thermometer, Droplets, Activity, Egg, Download, Calendar, Trash2 } from "lucide-react"
+import { Plus, FileText, Thermometer, Droplets, Activity, Egg, Download, Calendar, Package } from "lucide-react"
 import { useAviculture } from "@/contexts/AvicultureContext"
 import { showToast } from "@/lib/utils"
 import { formatDate } from "@/lib/aviculture/helpers"
@@ -90,7 +89,7 @@ export function ReportsTab() {
         report.feedConsumed,
         report.waterConsumed,
         report.eggCount || 0,
-        `"${report.observations.replace(/"/g, '""')}"`,
+        `"${(report.observations || "").replace(/"/g, '""')}"`,
       ]
       csvRows.push(row.join(","))
     })
@@ -105,10 +104,6 @@ export function ReportsTab() {
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
     showToast("Export CSV réussi", "success")
-  }
-
-  const getBatchName = (batchId: string) => {
-    return batches.find(b => b.id === batchId)?.name || batchId
   }
 
   const filteredReports = activeBatchFilter === "all" 
@@ -353,7 +348,7 @@ export function ReportsTab() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-red-600">
-                  {dailyReports.reduce((sum, r) => sum + r.mortality, 0)}
+                  {dailyReports.reduce((sum, r) => sum + (r.mortality || 0), 0)}
                 </p>
                 <p className="text-xs text-gray-500">Mortalité totale</p>
               </div>
@@ -365,7 +360,9 @@ export function ReportsTab() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-orange-600">
-                  {Math.round(dailyReports.reduce((sum, r) => sum + (r.temperature || 0), 0) / dailyReports.length)}°C
+                  {dailyReports.length > 0 
+                    ? Math.round(dailyReports.reduce((sum, r) => sum + (r.temperature || 0), 0) / dailyReports.length) 
+                    : 0}°C
                 </p>
                 <p className="text-xs text-gray-500">Temp. moyenne</p>
               </div>
@@ -376,10 +373,3 @@ export function ReportsTab() {
     </div>
   )
 }
-
-// Composant Package pour l'icône (si non importé)
-const Package = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-  </svg>
-)
