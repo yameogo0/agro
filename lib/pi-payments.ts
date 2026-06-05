@@ -1,4 +1,5 @@
-// Types pour les paiements Pi
+// lib/pi-payments.ts
+
 export interface PiPayment {
   identifier: string;
   amount: number;
@@ -7,7 +8,6 @@ export interface PiPayment {
   txid?: string;
 }
 
-// Interface pour le SDK Pi
 declare global {
   interface Window {
     Pi?: {
@@ -21,25 +21,25 @@ declare global {
   }
 }
 
-/**
- * Crée un paiement Pi Network
- * @param amount - Montant en Pi
- * @param memo - Description du paiement
- * @returns Promesse avec l'identifiant du paiement
- */
 export const createPiPayment = async (amount: number, memo: string): Promise<{ identifier: string; txid?: string }> => {
-  if (typeof window === 'undefined') {
-    throw new Error('Pi SDK non disponible (serveur)');
+  if (typeof window === 'undefined') throw new Error('Pi SDK non disponible (serveur)');
+
+  // Attendre que le SDK soit chargé (max 3 secondes)
+  let retries = 0;
+  while (!window.Pi && retries < 30) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    retries++;
   }
 
-  // Vérifier que le SDK Pi est chargé
   if (!window.Pi) {
     throw new Error('SDK Pi non chargé. Veuillez ouvrir dans Pi Browser.');
   }
 
   try {
+    // Le montant doit être un nombre, pas une chaîne
+    const amountNumber = typeof amount === 'string' ? parseFloat(amount) : amount;
     const payment = await window.Pi.createPayment({
-      amount,
+      amount: amountNumber,
       memo,
       metadata: {
         source: 'agro-multicenter',
@@ -47,23 +47,17 @@ export const createPiPayment = async (amount: number, memo: string): Promise<{ i
       },
     });
     return payment;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erreur paiement Pi:', error);
-    throw new Error('Le paiement a échoué. Veuillez réessayer.');
+    throw new Error(error.message || 'Le paiement a échoué. Veuillez réessayer.');
   }
 };
 
-/**
- * Vérifie si le SDK Pi est disponible
- */
 export const isPiSDKAvailable = (): boolean => {
   if (typeof window === 'undefined') return false;
   return !!window.Pi;
 };
 
-/**
- * Initialise le SDK Pi (optionnel, le SDK se charge automatiquement)
- */
 export const initPiSDK = async (sandbox: boolean = true): Promise<void> => {
   if (typeof window === 'undefined') return;
   if (!window.Pi) return;
@@ -73,6 +67,7 @@ export const initPiSDK = async (sandbox: boolean = true): Promise<void> => {
       version: '2.0',
       sandbox,
     });
+    console.log('✅ SDK Pi initialisé avec succès');
   } catch (error) {
     console.error('Erreur init Pi SDK:', error);
   }
