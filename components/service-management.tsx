@@ -29,16 +29,19 @@ import {
   WifiOff,
   RefreshCw,
   Pi,
+  Crown,
 } from "lucide-react"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { usePiAuth } from "@/contexts/pi-auth-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useSubscription } from "@/contexts/SubscriptionContext"
 import { showToast } from "@/lib/utils"
 import { createPiPayment, isPiSDKAvailable } from "@/lib/pi-payments"
 
 interface ServiceManagementProps {
   currentLanguage: string
   userRegion: string
+  onTabChange?: (tab: string) => void
 }
 
 interface Service {
@@ -92,7 +95,7 @@ interface Booking {
   paymentId?: string
 }
 
-export default function ServiceManagement({ currentLanguage, userRegion }: ServiceManagementProps) {
+export default function ServiceManagement({ currentLanguage, userRegion, onTabChange }: ServiceManagementProps) {
   const [activeTab, setActiveTab] = useState("browse")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
@@ -102,6 +105,7 @@ export default function ServiceManagement({ currentLanguage, userRegion }: Servi
 
   const isOnline = useOnlineStatus()
   const { isAuthenticated, userData } = usePiAuth()
+  const { isVif } = useSubscription() // ✅ Récupération du statut Membre Vif
   const [favoriteServices, setFavoriteServices] = useLocalStorage<string[]>("favoriteServices", [])
   const [myBookings, setMyBookings] = useLocalStorage<Booking[]>("userBookings", [])
 
@@ -320,6 +324,12 @@ export default function ServiceManagement({ currentLanguage, userRegion }: Servi
   }
 
   const handleCreateService = () => {
+    // ✅ Vérification du statut Vif avant création
+    if (!isVif) {
+      showToast("Seuls les membres Vif peuvent créer des services. Abonnez-vous !", "error")
+      return
+    }
+    
     if (!newService.title || !newService.category || !newService.price) {
       showToast("Veuillez remplir tous les champs obligatoires", "error")
       return
@@ -376,7 +386,11 @@ export default function ServiceManagement({ currentLanguage, userRegion }: Servi
           </Button>
           <Dialog open={showCreateService} onOpenChange={setShowCreateService}>
             <DialogTrigger asChild>
-              <Button className="bg-green-600 hover:bg-green-700">
+              <Button 
+                className={`${isVif ? "bg-green-600 hover:bg-green-700" : "bg-gray-400 cursor-not-allowed"}`}
+                disabled={!isVif}
+                title={!isVif ? "Seuls les membres Vif peuvent proposer des services" : "Proposer un service"}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Proposer un service
               </Button>
@@ -403,6 +417,27 @@ export default function ServiceManagement({ currentLanguage, userRegion }: Servi
           </Dialog>
         </div>
       </div>
+
+      {/* ✅ Message pour les non-Vif */}
+      {!isVif && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Crown className="h-8 w-8 text-amber-500" />
+            <div>
+              <p className="font-semibold text-amber-800">Devenez Membre Vif</p>
+              <p className="text-sm text-amber-700">Proposez des services, vendez vos produits et recevez des pourboires</p>
+            </div>
+          </div>
+          <Button 
+            variant="outline" 
+            className="border-amber-400 text-amber-700 hover:bg-amber-50"
+            onClick={() => onTabChange?.('subscription')}
+          >
+            <Crown className="h-4 w-4 mr-2" />
+            S'abonner (1 π/mois)
+          </Button>
+        </div>
+      )}
 
       {/* Service Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -458,22 +493,85 @@ export default function ServiceManagement({ currentLanguage, userRegion }: Servi
         </TabsContent>
 
         <TabsContent value="my-services" className="mt-6 space-y-4">
-          <div className="flex justify-between items-center"><h3 className="text-lg font-semibold">Mes services ({myServices.length})</h3><Button size="sm" onClick={() => setShowCreateService(true)}><Plus className="h-4 w-4 mr-2" />Nouveau service</Button></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {myServices.map((service) => (
-              <Card key={service.id}>
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-semibold">{service.title}</h3>
-                    <div className="flex gap-1"><Button size="sm" variant="ghost" className="h-7 w-7 p-0"><Edit className="h-3 w-3" /></Button><Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500"><Trash2 className="h-3 w-3" /></Button></div>
-                  </div>
-                  <p className="text-sm text-gray-600 line-clamp-2 mb-3">{service.description}</p>
-                  <div className="grid grid-cols-2 gap-3 mb-3"><div className="text-center p-2 bg-green-50 rounded"><p className="text-lg font-bold text-green-600">{service.bookings}</p><p className="text-[10px] text-green-700">Réservations</p></div><div className="text-center p-2 bg-purple-50 rounded"><p className="text-lg font-bold text-purple-600">{service.earningsDisplay}</p><p className="text-[10px] text-purple-700">Gains</p></div></div>
-                  <div className="flex justify-between items-center"><div className="flex items-center gap-2"><Star className="h-3 w-3 text-yellow-500 fill-current" /><span className="text-sm">{service.rating}</span><Badge className={service.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}>{service.status === "active" ? "Actif" : "Inactif"}</Badge></div><p className="text-lg font-bold text-purple-600">{service.priceDisplay}</p></div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold">Mes services ({myServices.length})</h3>
+              {!isVif && myServices.length === 0 && (
+                <Badge variant="outline" className="text-amber-600 border-amber-300">
+                  <Crown className="h-3 w-3 mr-1" />
+                  Devenez Vif
+                </Badge>
+              )}
+            </div>
+            <Button 
+              size="sm" 
+              onClick={() => setShowCreateService(true)}
+              disabled={!isVif}
+              title={!isVif ? "Seuls les membres Vif peuvent créer des services" : ""}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nouveau service
+            </Button>
           </div>
+          
+          {myServices.length === 0 && !isVif ? (
+            <Card className="bg-amber-50 border-amber-200">
+              <CardContent className="p-8 text-center">
+                <Crown className="h-12 w-12 text-amber-400 mx-auto mb-3" />
+                <p className="font-medium text-amber-800">Vous n'avez pas encore de services</p>
+                <p className="text-sm text-amber-700 mb-4">Devenez Membre Vif pour proposer vos services</p>
+                <Button 
+                  variant="outline" 
+                  className="border-amber-400 text-amber-700"
+                  onClick={() => onTabChange?.('subscription')}
+                >
+                  <Crown className="h-4 w-4 mr-2" />
+                  Devenir Membre Vif (1 π/mois)
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {myServices.map((service) => (
+                <Card key={service.id}>
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="font-semibold">{service.title}</h3>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" disabled={!isVif}>
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500" disabled={!isVif}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600 line-clamp-2 mb-3">{service.description}</p>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div className="text-center p-2 bg-green-50 rounded">
+                        <p className="text-lg font-bold text-green-600">{service.bookings}</p>
+                        <p className="text-[10px] text-green-700">Réservations</p>
+                      </div>
+                      <div className="text-center p-2 bg-purple-50 rounded">
+                        <p className="text-lg font-bold text-purple-600">{service.earningsDisplay}</p>
+                        <p className="text-[10px] text-purple-700">Gains</p>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Star className="h-3 w-3 text-yellow-500 fill-current" />
+                        <span className="text-sm">{service.rating}</span>
+                        <Badge className={service.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}>
+                          {service.status === "active" ? "Actif" : "Inactif"}
+                        </Badge>
+                      </div>
+                      <p className="text-lg font-bold text-purple-600">{service.priceDisplay}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="bookings" className="mt-6">
