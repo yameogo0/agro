@@ -1,7 +1,7 @@
-'use client'
+"use client"
 
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -10,13 +10,13 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Package, ShoppingCart, Loader2 } from 'lucide-react'
-import { useAvicultureData } from '@/hooks/useAvicultureData'
+import { useAviculture } from '@/contexts/AvicultureContext'
 import { usePiPayment } from '@/hooks/usePiPayment'
 import { addFeedOrder } from '@/lib/aviculture/storage'
 import { showToast } from '@/lib/utils'
 
 export function FeedingTab() {
-  const { feedStock, updateFeedStock } = useAvicultureData()
+  const { feedStock, updateFeedStock } = useAviculture()
   const { processPayment, isProcessing } = usePiPayment()
   const [selectedFeedId, setSelectedFeedId] = useState('')
   const [quantity, setQuantity] = useState(0)
@@ -121,6 +121,11 @@ export function FeedingTab() {
                 value={quantity}
                 onChange={e => setQuantity(Number(e.target.value))}
               />
+              {selectedFeedId && quantity > 0 && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Total: {(feedStock.find(f => f.id === selectedFeedId)?.pricePerUnit || 0) * quantity} π
+                </p>
+              )}
             </div>
             <Button onClick={handleOrder} disabled={isProcessing} className="w-full">
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Payer avec Pi'}
