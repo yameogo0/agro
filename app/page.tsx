@@ -38,7 +38,7 @@ import {
 
 import Dashboard from "@/components/dashboard"
 import MobileNavigation from "@/components/mobile-navigation"
-import AvicultureManagement from "@/components/aviculture-management"
+import AvicultureManagement from "@/components/aviculture"
 import UserProfile from "@/components/user-profile"
 import PiWalletIntegration from "@/components/pi-wallet-integration"
 import MessagingSystem from "@/components/messaging-system"
