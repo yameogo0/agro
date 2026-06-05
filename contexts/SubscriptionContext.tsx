@@ -43,21 +43,24 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     : 0
 
   const subscribe = async (): Promise<boolean> => {
+    console.log("🔵 Abonnement - Début")
     const success = await processPayment(
       SUBSCRIPTION_PRICE,
-      `Abonnement Membre Vif (${SUBSCRIPTION_DURATION_DAIS} jours)`,
+      `Abonnement Membre Vif (${SUBSCRIPTION_DURATION_DAYS} jours)`, // ✅ CORRIGÉ
       (paymentId) => {
+        console.log("🔵 Abonnement - Paiement réussi", paymentId)
         const currentValid = isSubscriptionValid()
         if (currentValid) {
           renewSubscription(paymentId)
-          showToast('Abonnement prolongé de 30 jours !', 'success')
+          showToast('✅ Abonnement prolongé de 30 jours !', 'success')
         } else {
           activateVif(SUBSCRIPTION_DURATION_DAYS, paymentId)
-          showToast('Bienvenue Membre Vif !', 'success')
+          showToast('👑 Bienvenue Membre Vif !', 'success')
         }
         checkStatus()
       }
     )
+    console.log("🔵 Abonnement - Résultat:", success)
     return success
   }
 
