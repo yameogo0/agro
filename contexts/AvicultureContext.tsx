@@ -172,4 +172,162 @@ export const AvicultureProvider = ({ children }: { children: ReactNode }) => {
 
   const updateBatch = (batch: PoultryBatch) => {
     const updatedBatch = { ...batch, updatedAt: new Date().toISOString() }
-    const newBatches = batches
+    const newBatches = batches.map(b => b.id === batch.id ? updatedBatch : b)
+    setBatches(newBatches)
+    saveBatches(newBatches)
+  }
+
+  const deleteBatch = (id: string) => {
+    const newBatches = batches.filter(b => b.id !== id)
+    setBatches(newBatches)
+    saveBatches(newBatches)
+  }
+
+  const getBatch = (id: string) => getBatchById(id)
+
+  // Actions Santé
+  const addHealthRecord = (record: Omit<HealthRecord, 'id'>) => {
+    const newRecord: HealthRecord = {
+      ...record,
+      id: Date.now().toString(),
+    }
+    const newRecords = [newRecord, ...healthRecords]
+    setHealthRecords(newRecords)
+    saveHealthRecords(newRecords)
+  }
+
+  const updateHealthRecord = (record: HealthRecord) => {
+    const newRecords = healthRecords.map(r => r.id === record.id ? record : r)
+    setHealthRecords(newRecords)
+    saveHealthRecords(newRecords)
+  }
+
+  const deleteHealthRecord = (id: string) => {
+    const newRecords = healthRecords.filter(r => r.id !== id)
+    setHealthRecords(newRecords)
+    saveHealthRecords(newRecords)
+  }
+
+  // Actions Alimentation
+  const updateFeedStock = (newStock: FeedStock[]) => {
+    setFeedStock(newStock)
+    saveFeedStock(newStock)
+  }
+
+  const handleAddFeedOrder = (order: Omit<FeedOrder, 'id'>) => {
+    const newOrder: FeedOrder = {
+      ...order,
+      id: Date.now().toString(),
+    }
+    addFeedOrder(newOrder)
+    setFeedOrders([newOrder, ...feedOrders])
+  }
+
+  const orderFeed = async (feedId: string, quantity: number, paymentId: string): Promise<boolean> => {
+    const feed = feedStock.find(f => f.id === feedId)
+    if (!feed) return false
+
+    const totalPrice = feed.pricePerUnit * quantity
+    
+    handleAddFeedOrder({
+      feedId,
+      quantity,
+      totalPrice,
+      date: new Date().toISOString(),
+      paymentId,
+      status: 'completed',
+    })
+    
+    updateFeedStockQuantity(feedId, quantity)
+    refreshData()
+    return true
+  }
+
+  // Actions Services
+  const handleAddVetBooking = (booking: Omit<VetBooking, 'id' | 'createdAt'>) => {
+    const newBooking: VetBooking = {
+      ...booking,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+    }
+    addVetBooking(newBooking)
+    setVetBookings([newBooking, ...vetBookings])
+  }
+
+  const cancelVetBooking = (bookingId: string) => {
+    updateVetBookingStatus(bookingId, 'cancelled')
+    setVetBookings(getVetBookings())
+  }
+
+  // Actions Rapports
+  const handleAddDailyReport = (report: Omit<DailyReport, 'id'>) => {
+    const newReport: DailyReport = {
+      ...report,
+      id: Date.now().toString(),
+    }
+    addDailyReport(newReport)
+    setDailyReports([newReport, ...dailyReports])
+  }
+
+  // Actions Alertes
+  const handleAddAlert = (alert: Omit<Alert, 'id' | 'createdAt' | 'read'>) => {
+    const newAlert: Alert = {
+      ...alert,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+      read: false,
+    }
+    addAlert(newAlert)
+    setAlerts([newAlert, ...alerts])
+  }
+
+  const markAlertRead = (alertId: string) => {
+    markAlertAsRead(alertId)
+    setAlerts(getAlerts())
+  }
+
+  const deleteAlertById = (alertId: string) => {
+    deleteAlert(alertId)
+    setAlerts(getAlerts())
+  }
+
+  return (
+    <AvicultureContext.Provider value={{
+      batches,
+      healthRecords,
+      feedStock,
+      feedOrders,
+      vetServices,
+      vetBookings,
+      dailyReports,
+      alerts,
+      stats,
+      addBatch,
+      updateBatch,
+      deleteBatch,
+      getBatch,
+      addHealthRecord,
+      updateHealthRecord,
+      deleteHealthRecord,
+      updateFeedStock,
+      addFeedOrder: handleAddFeedOrder,
+      orderFeed,
+      addVetBooking: handleAddVetBooking,
+      cancelVetBooking,
+      addDailyReport: handleAddDailyReport,
+      addAlert: handleAddAlert,
+      markAlertRead,
+      deleteAlert: deleteAlertById,
+      refreshData,
+      isLoading,
+    }}>
+      {children}
+    </AvicultureContext.Provider>
+  )
+}
+
+export const useAviculture = () => {
+  const context = useContext(AvicultureContext)
+  if (!context) throw new Error('useAviculture must be used within AvicultureProvider')
+  return context
+}
