@@ -28,7 +28,6 @@ import {
   WifiOff,
   X,
   Download,
-  Filter,
   Calendar,
   PieChart,
   LineChart,
@@ -40,10 +39,11 @@ import {
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useSubscription } from "@/contexts/SubscriptionContext"
-import { showToast, formatDate, formatRelativeTime, formatNumber } from "@/lib/utils"
+import { showToast, formatDate, formatRelativeTime } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { calculateTransactionTax } from "@/lib/subscription/tax-utils"
+import { createDirectPayment, isPiReady } from "@/lib/pi-sdk"
 
 interface PiWalletIntegrationProps {
   currentLanguage: string
@@ -61,8 +61,8 @@ interface Transaction {
   status: "completed" | "pending" | "failed"
   txHash: string
   category?: "service" | "transfer" | "subscription" | "product"
-  tax?: number // Taxe appliquée (pour les ventes)
-  netAmount?: number // Montant net après taxe
+  tax?: number
+  netAmount?: number
 }
 
 interface RecurringPayment {
@@ -78,7 +78,7 @@ interface RecurringPayment {
 
 export default function PiWalletIntegration({ currentLanguage, userRegion }: PiWalletIntegrationProps) {
   const isOnline = useOnlineStatus()
-  const { isVif } = useSubscription() // ✅ Récupération du statut Membre Vif
+  const { isVif } = useSubscription()
   const [activeTab, setActiveTab] = useState("wallet")
   const [showBalance, setShowBalance] = useState(true)
   const [sendAmount, setSendAmount] = useState("")
@@ -94,14 +94,13 @@ export default function PiWalletIntegration({ currentLanguage, userRegion }: PiW
   const [showQRModal, setShowQRModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
 
-  // Données persistantes
   const [walletData, setWalletData] = useLocalStorage("piWalletData", {
     balance: 15.7834,
     lockedBalance: 2.1567,
     pendingTransactions: 1,
     totalEarned: 45.2341,
     totalSpent: 29.4507,
-    totalTaxCollected: 0.0, // ✅ Nouveau champ pour la taxe collectée
+    totalTaxCollected: 0.0,
     address: "GCKFBEIYTKQTIQ7VIN54JHKOQ2QZSMH6APPQPLZX2BG4O6JJZWRBTPI7",
   })
 
@@ -170,46 +169,61 @@ export default function PiWalletIntegration({ currentLanguage, userRegion }: PiW
     setShowSendConfirm(true)
   }
 
+  // ✅ VERSION CORRIGÉE : Envoi réel avec SDK Pi
   const confirmSend = async () => {
     if (!isOnline) {
       showToast("Connexion internet requise", "error")
       return
     }
     
+    if (!isPiReady()) {
+      showToast("Veuillez ouvrir cette application dans Pi Browser", "error")
+      return
+    }
+    
     setIsSending(true)
     const amount = parseFloat(sendAmount)
     
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    const newTransaction: Transaction = {
-      id: `tx${Date.now()}`,
-      type: "sent",
-      amount: amount,
-      to: recipientAddress,
-      description: sendDescription || "Envoi Pi",
-      date: new Date().toISOString(),
-      status: "completed",
-      txHash: Math.random().toString(36).substring(2, 15),
-      category: "transfer",
+    try {
+      const payment = await createDirectPayment(amount, sendDescription || `Envoi à ${recipientName || recipientAddress}`)
+      
+      if (payment?.identifier) {
+        const newTransaction: Transaction = {
+          id: `tx${Date.now()}`,
+          type: "sent",
+          amount: amount,
+          to: recipientAddress,
+          description: sendDescription || "Envoi Pi",
+          date: new Date().toISOString(),
+          status: "completed",
+          txHash: payment.identifier,
+          category: "transfer",
+        }
+        
+        setTransactions([newTransaction, ...transactions])
+        setWalletData(prev => ({
+          ...prev,
+          balance: prev.balance - amount,
+          totalSpent: prev.totalSpent + amount,
+        }))
+        
+        setShowSendConfirm(false)
+        setSendAmount("")
+        setRecipientAddress("")
+        setRecipientName("")
+        setSendDescription("")
+        showToast(`✅ Envoi de ${amount} π réussi`, "success")
+      } else {
+        throw new Error("Paiement non confirmé")
+      }
+    } catch (error: any) {
+      console.error("Erreur envoi:", error)
+      showToast(error.message || "Erreur lors de l'envoi", "error")
+    } finally {
+      setIsSending(false)
     }
-    
-    setTransactions([newTransaction, ...transactions])
-    setWalletData(prev => ({
-      ...prev,
-      balance: prev.balance - amount,
-      totalSpent: prev.totalSpent + amount,
-    }))
-    
-    setShowSendConfirm(false)
-    setSendAmount("")
-    setRecipientAddress("")
-    setRecipientName("")
-    setSendDescription("")
-    setIsSending(false)
-    showToast(`Envoi de ${amount} π réussi`, "success")
   }
 
-  // ✅ Fonction pour traiter une vente avec taxe (appelée depuis service-management)
   const processSaleWithTax = useCallback((amount: number, sellerIsVif: boolean, description: string) => {
     const { tax, netAmount } = calculateTransactionTax(amount, sellerIsVif)
     
@@ -430,7 +444,6 @@ export default function PiWalletIntegration({ currentLanguage, userRegion }: PiW
             <Card><CardContent className="p-4 text-center"><p className="text-xl font-bold text-blue-600">{(stats.totalEarned - stats.totalSpent).toFixed(4)} π</p><p className="text-xs text-gray-500">Bénéfice net</p></CardContent></Card>
           </div>
 
-          {/* Paiements récurrents */}
           {recurringPayments.filter(p => p.active).length > 0 && (
             <Card><CardHeader><CardTitle className="flex items-center gap-2"><Repeat className="h-5 w-5" />Paiements récurrents</CardTitle></CardHeader><CardContent><div className="space-y-3">{recurringPayments.filter(p => p.active).map(p => (<div key={p.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"><div><p className="font-medium">{p.toName}</p><p className="text-xs text-gray-500">{p.description} • {p.frequency}</p><p className="text-xs text-purple-600">Prochain: {p.nextDate}</p></div><div className="text-right"><p className="font-bold text-purple-600">{p.amount} π</p><Badge className="bg-blue-100 text-blue-700">Actif</Badge></div></div>))}</div></CardContent></Card>
           )}
@@ -477,13 +490,16 @@ export default function PiWalletIntegration({ currentLanguage, userRegion }: PiW
         </TabsContent>
       </Tabs>
 
-      {/* Modals (conservés identiques) */}
+      {/* Modal de confirmation d'envoi */}
       {showSendConfirm && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-md w-full mx-4"><div className="flex justify-between items-center mb-4"><h3 className="text-lg font-semibold flex items-center gap-2"><AlertCircle className="h-5 w-5 text-yellow-500" />Confirmer l'envoi</h3><button onClick={() => setShowSendConfirm(false)}><X className="h-5 w-5" /></button></div><div className="space-y-3 mb-4"><div className="flex justify-between p-2 bg-gray-50 rounded"><span>Destinataire:</span><span className="font-mono text-sm">{recipientAddress.substring(0, 15)}...</span></div>{recipientName && <div className="flex justify-between p-2 bg-gray-50 rounded"><span>Nom:</span><span>{recipientName}</span></div>}<div className="flex justify-between p-2 bg-gray-50 rounded"><span>Montant:</span><span className="font-bold text-purple-600">{sendAmount} π</span></div>{sendDescription && <div className="flex justify-between p-2 bg-gray-50 rounded"><span>Description:</span><span>{sendDescription}</span></div>}<div className="flex justify-between p-2 bg-yellow-50 rounded"><span>Frais réseau:</span><span className="text-yellow-600">~0.001 π</span></div></div><div className="flex gap-3"><Button variant="outline" className="flex-1" onClick={() => setShowSendConfirm(false)}>Annuler</Button><Button className="flex-1 bg-purple-600 hover:bg-purple-700" onClick={confirmSend} disabled={isSending}>{isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmer"}</Button></div></div></div>)}
 
+      {/* Modal QR Code */}
       {showQRModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 text-center"><div className="flex justify-end"><button onClick={() => setShowQRModal(false)} className="text-gray-400"><X className="h-5 w-5" /></button></div><div className="w-48 h-48 bg-gradient-to-r from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto my-4"><QrCode className="h-32 w-32 text-white" /></div><p className="font-mono text-xs break-all bg-gray-100 p-2 rounded-lg">{walletData.address}</p><Button className="mt-4 w-full gap-2" onClick={() => copyToClipboard(walletData.address)}><Copy className="h-4 w-4" />Copier l'adresse</Button><p className="text-xs text-gray-500 mt-3">Scannez pour recevoir des Pi</p></div></div>)}
 
+      {/* Modal paiement récurrent */}
       {showRecurringModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-md w-full mx-4"><div className="flex justify-between items-center mb-4"><h3 className="text-lg font-semibold flex items-center gap-2"><Repeat className="h-5 w-5" />Paiement récurrent</h3><button onClick={() => setShowRecurringModal(false)}><X className="h-5 w-5" /></button></div><div className="space-y-4"><div><label className="text-sm font-medium">Adresse destinataire</label><Input placeholder="Adresse Pi" value={newRecurring.to} onChange={e => setNewRecurring({ ...newRecurring, to: e.target.value })} /></div><div><label className="text-sm font-medium">Nom</label><Input placeholder="Nom" value={newRecurring.toName} onChange={e => setNewRecurring({ ...newRecurring, toName: e.target.value })} /></div><div><label className="text-sm font-medium">Montant (π)</label><Input type="number" step="0.001" placeholder="0.000" value={newRecurring.amount} onChange={e => setNewRecurring({ ...newRecurring, amount: e.target.value })} /></div><div><label className="text-sm font-medium">Description</label><Input placeholder="Motif" value={newRecurring.description} onChange={e => setNewRecurring({ ...newRecurring, description: e.target.value })} /></div><div><label className="text-sm font-medium">Fréquence</label><select className="w-full p-2 border rounded" value={newRecurring.frequency} onChange={e => setNewRecurring({ ...newRecurring, frequency: e.target.value })}><option value="weekly">Hebdomadaire</option><option value="monthly">Mensuel</option></select></div><Button className="w-full bg-purple-600" onClick={addRecurringPayment}>Ajouter</Button></div></div></div>)}
 
+      {/* Modal paramètres */}
       {showSettingsModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-md w-full mx-4"><div className="flex justify-between items-center mb-4"><h3 className="text-lg font-semibold flex items-center gap-2"><Settings className="h-5 w-5" />Paramètres</h3><button onClick={() => setShowSettingsModal(false)}><X className="h-5 w-5" /></button></div><div className="space-y-4"><div className="flex justify-between items-center"><div><p className="font-medium">Notifications</p><p className="text-xs text-gray-500">Alertes de transactions</p></div><Badge className="bg-green-100 text-green-700">Activées</Badge></div><div className="flex justify-between items-center"><div><p className="font-medium">Authentification 2FA</p><p className="text-xs text-gray-500">Sécurité renforcée</p></div><Badge className="bg-green-100 text-green-700">Activée</Badge></div><div className="flex justify-between items-center"><div><p className="font-medium">Mode hors ligne</p><p className="text-xs text-gray-500">Données en cache</p></div><Badge className="bg-blue-100 text-blue-700">Actif</Badge></div><div className="pt-4 border-t"><Button variant="destructive" className="w-full">Déconnecter le portefeuille</Button></div></div></div></div>)}
     </div>
   )
