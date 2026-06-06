@@ -172,37 +172,57 @@ export default function PiWalletIntegration({ currentLanguage, userRegion }: PiW
   // ✅ VERSION CORRIGÉE : Envoi réel avec SDK Pi
   const confirmSend = async () => {
     if (!isOnline) {
-      showToast("Connexion internet requise", "error");
-      return;
+      showToast("Connexion internet requise", "error")
+      return
     }
-    setIsSending(true);
-    const amount = parseFloat(sendAmount);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const newTransaction: Transaction = {
-      id: `tx${Date.now()}`,
-      type: "sent",
-      amount: amount,
-      to: recipientAddress,
-      description: sendDescription || "Envoi Pi",
-      date: new Date().toISOString(),
-      status: "completed",
-      txHash: Math.random().toString(36).substring(2, 15),
-      category: "transfer",
-    };
-    setTransactions([newTransaction, ...transactions]);
-    setWalletData(prev => ({
-      ...prev,
-      balance: prev.balance - amount,
-      totalSpent: prev.totalSpent + amount,
-    }));
-    setShowSendConfirm(false);
-    setSendAmount("");
-    setRecipientAddress("");
-    setRecipientName("");
-    setSendDescription("");
-    setIsSending(false);
-    showToast(`Envoi de ${amount} π réussi`, "success");
-  };
+    
+    if (!isPiReady()) {
+      showToast("Veuillez ouvrir cette application dans Pi Browser", "error")
+      return
+    }
+    
+    setIsSending(true)
+    const amount = parseFloat(sendAmount)
+    
+    try {
+      const payment = await createDirectPayment(amount, sendDescription || `Envoi à ${recipientName || recipientAddress}`)
+      
+      if (payment?.identifier) {
+        const newTransaction: Transaction = {
+          id: `tx${Date.now()}`,
+          type: "sent",
+          amount: amount,
+          to: recipientAddress,
+          description: sendDescription || "Envoi Pi",
+          date: new Date().toISOString(),
+          status: "completed",
+          txHash: payment.identifier,
+          category: "transfer",
+        }
+        
+        setTransactions([newTransaction, ...transactions])
+        setWalletData(prev => ({
+          ...prev,
+          balance: prev.balance - amount,
+          totalSpent: prev.totalSpent + amount,
+        }))
+        
+        setShowSendConfirm(false)
+        setSendAmount("")
+        setRecipientAddress("")
+        setRecipientName("")
+        setSendDescription("")
+        showToast(`✅ Envoi de ${amount} π réussi`, "success")
+      } else {
+        throw new Error("Paiement non confirmé")
+      }
+    } catch (error: any) {
+      console.error("Erreur envoi:", error)
+      showToast(error.message || "Erreur lors de l'envoi", "error")
+    } finally {
+      setIsSending(false)
+    }
+  }
 
   const processSaleWithTax = useCallback((amount: number, sellerIsVif: boolean, description: string) => {
     const { tax, netAmount } = calculateTransactionTax(amount, sellerIsVif)
