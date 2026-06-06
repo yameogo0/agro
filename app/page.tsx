@@ -61,7 +61,7 @@ function AppContent() {
   const isOnline = useOnlineStatus()
 
   // ✅ Géolocalisation GPS réelle
-  const { latitude, longitude, accuracy, loading: geoLoading, refresh: refreshGeo } = useGeolocation({
+  const { latitude, longitude, loading: geoLoading, refresh: refreshGeo } = useGeolocation({
     enableHighAccuracy: true,
     timeout: 15000,
     maximumAge: 0,
@@ -350,7 +350,11 @@ function AppContent() {
                   <div>
                     <p className="text-[10px] text-green-100">📍 Position actuelle</p>
                     <p className="text-sm font-semibold flex items-center gap-1">
-                      {geoLoading ? "..." : (gpsAddress || userRegion)}
+                      {geoLoading ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        gpsAddress || userRegion
+                      )}
                       <MapPin className="h-3 w-3" />
                     </p>
                   </div>
@@ -405,7 +409,14 @@ function AppContent() {
           </div>
         </div>
 
-        <MobileNavigation activeTab={activeTab} onTabChange={setActiveTab} onMenuToggle={() => setIsMenuOpen(!isMenuOpen)} unreadCount={unreadMessages} notificationCount={notificationCount} currentLanguage={currentLanguage} />
+        <MobileNavigation 
+          activeTab={activeTab} 
+          onTabChange={setActiveTab} 
+          onMenuToggle={() => setIsMenuOpen(!isMenuOpen)} 
+          unreadCount={unreadMessages} 
+          notificationCount={notificationCount} 
+          currentLanguage={currentLanguage} 
+        />
       </div>
     </div>
   )
