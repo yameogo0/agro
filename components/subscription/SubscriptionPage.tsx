@@ -1,93 +1,106 @@
-// components/subscription/SubscriptionPage.tsx
+"use client";
 
-"use client"
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Crown, CheckCircle, XCircle, Loader2, AlertCircle } from "lucide-react";
+import { usePiAuth } from "@/contexts/pi-auth-context";
+import { useOnlineStatus } from "@/hooks/use-online-status";
+import { initPiSDK } from "@/lib/pi-init";
+import { showToast } from "@/lib/utils";
 
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Crown, CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react'
-import { useSubscription } from '@/contexts/SubscriptionContext'
-import { usePiAuth } from '@/contexts/pi-auth-context'
-import { useOnlineStatus } from '@/hooks/use-online-status'
-import { createPiPayment, isPiSDKAvailable } from '@/lib/pi-payments'
-import { showToast } from '@/lib/utils'
-import { activateVif, isSubscriptionValid } from '@/lib/subscription/subscription-storage'
-import { SUBSCRIPTION_PRICE, SUBSCRIPTION_DURATION_DAYS } from '@/lib/subscription/subscription-constants'
+// Constantes
+const SUBSCRIPTION_PRICE = 1;
+const SUBSCRIPTION_DURATION_DAYS = 30;
 
 export default function SubscriptionPage() {
-  const { isVif, remainingDays, isLoading, expiryDate, checkStatus } = useSubscription()
-  const { isAuthenticated } = usePiAuth()
-  const isOnline = useOnlineStatus()
-  const [isProcessing, setIsProcessing] = useState(false)
+  const { isAuthenticated } = usePiAuth();
+  const isOnline = useOnlineStatus();
+  const [isVif, setIsVif] = useState(false);
+  const [expiryDate, setExpiryDate] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [sdkReady, setSdkReady] = useState(false);
+
+  // Vérifier le statut Vif depuis localStorage
+  const checkStatus = () => {
+    const data = localStorage.getItem("subscription_vif");
+    if (data) {
+      const sub = JSON.parse(data);
+      const valid = sub.isVif && new Date(sub.expiryDate) > new Date();
+      setIsVif(valid);
+      setExpiryDate(sub.expiryDate);
+    } else {
+      setIsVif(false);
+      setExpiryDate(null);
+    }
+    setIsLoading(false);
+  };
+
+  // Initialiser le SDK Pi
+  useEffect(() => {
+    const init = async () => {
+      const ready = await initPiSDK(true);
+      setSdkReady(ready);
+    };
+    init();
+    checkStatus();
+  }, []);
+
+  const remainingDays = expiryDate
+    ? Math.max(0, Math.ceil((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
 
   const handleSubscribe = async () => {
-    console.log("🔵 Bouton cliqué - Début du processus")
-    
-    // Vérification 1 : Connexion internet
+    // Vérifications préalables
     if (!isOnline) {
-      showToast("Connexion internet requise", "error")
-      return
+      showToast("Connexion internet requise", "error");
+      return;
     }
-    console.log("✅ Internet OK")
-
-    // Vérification 2 : Authentification Pi
     if (!isAuthenticated) {
-      showToast("Veuillez vous connecter avec Pi Network", "error")
-      return
+      showToast("Veuillez vous connecter avec Pi Network", "error");
+      return;
     }
-    console.log("✅ Authentification OK")
-
-    // Vérification 3 : SDK Pi disponible
-    const sdkAvailable = isPiSDKAvailable()
-    console.log("SDK Pi disponible ?", sdkAvailable, "window.Pi:", typeof window !== 'undefined' && !!window.Pi)
-    
-    if (!sdkAvailable) {
-      showToast("Veuillez ouvrir cette application dans Pi Browser", "error")
-      return
+    if (!sdkReady || typeof window === "undefined" || !window.Pi) {
+      showToast("SDK Pi non disponible. Êtes-vous dans Pi Browser ?", "error");
+      return;
     }
-    console.log("✅ SDK Pi OK")
 
-    setIsProcessing(true)
+    setIsProcessing(true);
     try {
-      console.log("🔵 Création du paiement Pi...")
-      const payment = await createPiPayment(
-        SUBSCRIPTION_PRICE, 
-        `Abonnement Membre Vif (${SUBSCRIPTION_DURATION_DAYS} jours)`
-      )
-      console.log("🔵 Réponse paiement:", payment)
-      
+      // Appel direct au SDK Pi
+      const payment = await window.Pi.createPayment({
+        amount: SUBSCRIPTION_PRICE,
+        memo: `Abonnement Membre Vif (${SUBSCRIPTION_DURATION_DAYS} jours)`,
+        metadata: { source: "agro-multicenter", type: "subscription" },
+      });
+
       if (payment?.identifier) {
-        console.log("🔵 Paiement réussi, activation Vif...")
-        const currentValid = isSubscriptionValid()
-        if (currentValid) {
-          // Prolonger l'abonnement
-          const sub = JSON.parse(localStorage.getItem('subscription_vif') || '{}')
-          const newExpiry = new Date(sub.expiryDate)
-          newExpiry.setDate(newExpiry.getDate() + SUBSCRIPTION_DURATION_DAYS)
-          localStorage.setItem('subscription_vif', JSON.stringify({
-            isVif: true,
-            startDate: sub.startDate,
-            expiryDate: newExpiry.toISOString(),
-            transactionId: payment.identifier
-          }))
-          showToast("✅ Abonnement prolongé de 30 jours !", "success")
-        } else {
-          // Activer l'abonnement
-          activateVif(SUBSCRIPTION_DURATION_DAYS, payment.identifier)
-          showToast("👑 Bienvenue Membre Vif !", "success")
-        }
-        checkStatus()
+        // Mettre à jour le stockage local
+        const now = new Date();
+        const expiry = new Date();
+        expiry.setDate(now.getDate() + SUBSCRIPTION_DURATION_DAYS);
+        const subscriptionData = {
+          isVif: true,
+          startDate: now.toISOString(),
+          expiryDate: expiry.toISOString(),
+          transactionId: payment.identifier,
+        };
+        localStorage.setItem("subscription_vif", JSON.stringify(subscriptionData));
+        setIsVif(true);
+        setExpiryDate(expiry.toISOString());
+        showToast("👑 Bienvenue Membre Vif !", "success");
       } else {
-        throw new Error("Transaction non confirmée")
+        throw new Error("Paiement non confirmé");
       }
     } catch (err: any) {
-      console.error("🔴 Erreur paiement:", err)
-      showToast(err.message || "Le paiement a échoué", "error")
+      console.error("Erreur paiement:", err);
+      showToast(err.message || "Le paiement a échoué", "error");
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
+  };
 
   return (
     <div className="container max-w-4xl mx-auto py-10 px-4">
@@ -100,7 +113,6 @@ export default function SubscriptionPage() {
           <CardTitle className="text-3xl font-bold">Statut Membre Vif</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Statut actuel */}
           <div className="flex justify-center">
             {isVif ? (
               <Badge className="bg-green-100 text-green-700 text-lg py-2 px-6 rounded-full">
@@ -120,17 +132,16 @@ export default function SubscriptionPage() {
             </div>
           )}
 
-          {/* Tableau comparatif */}
           <div className="grid md:grid-cols-2 gap-6">
             <div className="border rounded-xl p-5 bg-white shadow-sm">
               <h3 className="font-bold text-xl mb-3 flex items-center gap-2">
                 <Crown className="h-5 w-5 text-yellow-500" /> Membre Vif
               </h3>
               <ul className="space-y-3">
-                <li className="flex items-start gap-2"><CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" /> <span>Proposer des services</span></li>
-                <li className="flex items-start gap-2"><CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" /> <span>Vendre des produits/services</span></li>
-                <li className="flex items-start gap-2"><CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" /> <span>Recevoir des Pi dans les conversations</span></li>
-                <li className="flex items-start gap-2"><CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" /> <span>Taxe de vente 0.99% seulement</span></li>
+                <li className="flex items-start gap-2"><CheckCircle className="h-5 w-5 text-green-500 mt-0.5" /> <span>Proposer des services</span></li>
+                <li className="flex items-start gap-2"><CheckCircle className="h-5 w-5 text-green-500 mt-0.5" /> <span>Vendre des produits/services</span></li>
+                <li className="flex items-start gap-2"><CheckCircle className="h-5 w-5 text-green-500 mt-0.5" /> <span>Recevoir des Pi dans les conversations</span></li>
+                <li className="flex items-start gap-2"><CheckCircle className="h-5 w-5 text-green-500 mt-0.5" /> <span>Taxe de vente 0.99% seulement</span></li>
               </ul>
             </div>
             <div className="border rounded-xl p-5 bg-gray-50 shadow-sm">
@@ -138,17 +149,16 @@ export default function SubscriptionPage() {
                 <XCircle className="h-5 w-5 text-gray-500" /> Compte Gratuit
               </h3>
               <ul className="space-y-3">
-                <li className="flex items-start gap-2"><XCircle className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" /> <span className="text-gray-500">Consultation des services</span></li>
-                <li className="flex items-start gap-2"><XCircle className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" /> <span className="text-gray-500">Achat de services/produits</span></li>
-                <li className="flex items-start gap-2"><XCircle className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" /> <span className="text-gray-500">Conversations simples</span></li>
+                <li className="flex items-start gap-2"><XCircle className="h-5 w-5 text-red-400 mt-0.5" /> <span className="text-gray-500">Consultation des services</span></li>
+                <li className="flex items-start gap-2"><XCircle className="h-5 w-5 text-red-400 mt-0.5" /> <span className="text-gray-500">Achat de services/produits</span></li>
+                <li className="flex items-start gap-2"><XCircle className="h-5 w-5 text-red-400 mt-0.5" /> <span className="text-gray-500">Conversations simples</span></li>
               </ul>
             </div>
           </div>
 
-          {/* Bouton d'abonnement */}
           <Button
             onClick={handleSubscribe}
-            disabled={isProcessing || isLoading}
+            disabled={isProcessing || isLoading || !sdkReady}
             className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white py-6 text-lg rounded-xl shadow-lg"
           >
             {isProcessing ? (
@@ -156,14 +166,13 @@ export default function SubscriptionPage() {
             ) : (
               <Crown className="h-5 w-5 mr-2" />
             )}
-            {isVif ? 'Prolonger l\'abonnement (1 π / mois)' : 'Devenir Membre Vif (1 π / mois)'}
+            {isVif ? "Prolonger l'abonnement (1 π / mois)" : "Devenir Membre Vif (1 π / mois)"}
           </Button>
 
-          {/* Message d'information si SDK non disponible */}
-          {typeof window !== 'undefined' && !window.Pi && (
+          {!sdkReady && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-2 text-sm text-yellow-700">
-              <AlertCircle className="h-4 w-4 flex-shrink-0" />
-              <span>Pour effectuer le paiement, veuillez ouvrir cette application dans Pi Browser.</span>
+              <AlertCircle className="h-4 w-4" />
+              <span>Chargement du SDK Pi... Assurez-vous d'être dans Pi Browser.</span>
             </div>
           )}
 
@@ -173,5 +182,5 @@ export default function SubscriptionPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
