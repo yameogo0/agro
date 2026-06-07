@@ -55,9 +55,10 @@ import { useGeolocation } from "@/hooks/use-geolocation"
 import { showToast } from "@/lib/utils"
 import { initPiSDK } from "@/lib/pi-payments"
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext"
+import { PiAuthProvider } from "@/contexts/pi-auth-context" // ✅ AJOUT
 
 function AppContent() {
-  const { isAuthenticated, isLoading, login, userData, error } = usePiAuth()
+  const { isAuthenticated, isLoading, login, userData, error, walletAddress } = usePiAuth() // ✅ Ajout walletAddress
   const isOnline = useOnlineStatus()
 
   // ✅ Géolocalisation GPS réelle
@@ -422,11 +423,13 @@ function AppContent() {
   )
 }
 
-// Composant principal avec SubscriptionProvider
+// ✅ CORRECTION : Ajout des deux providers
 export default function AgroMulticenterApp() {
   return (
-    <SubscriptionProvider>
-      <AppContent />
-    </SubscriptionProvider>
+    <PiAuthProvider>
+      <SubscriptionProvider>
+        <AppContent />
+      </SubscriptionProvider>
+    </PiAuthProvider>
   )
 }
