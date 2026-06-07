@@ -20,9 +20,11 @@ interface PiAuthContextType {
   isLoading: boolean;
   authMessage: string;
   userData: LoginDTO | null;
+  walletAddress: string | null; // ✅ Ajouté
   login: () => Promise<void>;
   logout: () => Promise<void>;
   isPiAvailable: boolean;
+  refreshWallet: () => Promise<void>; // ✅ Ajouté
 }
 
 declare global {
@@ -32,6 +34,10 @@ declare global {
       authenticate: (scopes: string[], options?: { onIncomplete?: (error: any) => void }) => Promise<{
         accessToken: string;
         user: { uid: string; username: string };
+      }>;
+      createPayment: (payment: { amount: number; memo: string; metadata?: Record<string, any> }) => Promise<{
+        identifier: string;
+        txid?: string;
       }>;
     };
   }
@@ -50,13 +56,26 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [authMessage, setAuthMessage] = useState("Initialisation...");
   const [userData, setUserData] = useState<LoginDTO | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isPiAvailable, setIsPiAvailable] = useState(false);
 
   const isDevelopment = process.env.NODE_ENV === "development";
 
+  // ✅ Rafraîchir l'adresse du portefeuille
+  const refreshWallet = async () => {
+    if (userData?.walletAddress) {
+      setWalletAddress(userData.walletAddress);
+    } else if (userData?.id) {
+      // Générer une adresse à partir de l'UID
+      const mockAddress = `PI_${userData.id.substring(0, 8)}...${userData.id.substring(userData.id.length - 4)}`;
+      setWalletAddress(mockAddress);
+    }
+  };
+
   // Activer le mode démo
   const activateDemoMode = () => {
     console.log("🎮 Mode démo activé");
+    const demoAddress = "GCKFBEIYTKQTIQ7VIN54JHKOQ2QZSMH6APPQPLZX2BG4O6JJZWRBTPI7";
     const demoUser: LoginDTO = {
       id: "demo-123",
       username: "Agriculteur_Demo",
@@ -65,9 +84,10 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       email: "demo@agromc.com",
       region: "Burkina Faso",
       verified: true,
-      walletAddress: "GCKFBEIYTKQTIQ7VIN54JHKOQ2QZSMH6APPQPLZX2BG4O6JJZWRBTPI7",
+      walletAddress: demoAddress,
     };
     setUserData(demoUser);
+    setWalletAddress(demoAddress);
     setIsAuthenticated(true);
     setAuthMessage("Mode démo - Connecté");
     setIsLoading(false);
@@ -94,18 +114,22 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
 
     setAuthMessage("Connexion réussie !");
     
-    // Créer l'utilisateur avec les données Pi
+    // ✅ Adresse de portefeuille réelle (dans Pi SDK, elle est liée à l'utilisateur)
+    // Pour le testnet, nous utilisons l'UID comme identifiant unique
+    const userWalletAddress = `PI_${piAuthResult.user.uid.substring(0, 8)}...`;
+    
     const newUser: LoginDTO = {
       id: piAuthResult.user.uid,
       username: piAuthResult.user.username,
       credits_balance: 0,
       terms_accepted: true,
-      walletAddress: piAuthResult.user.uid,
+      walletAddress: userWalletAddress,
       verified: true,
       region: "Burkina Faso", // À détecter via géolocalisation plus tard
     };
     
     setUserData(newUser);
+    setWalletAddress(userWalletAddress);
     setIsAuthenticated(true);
     
     // Sauvegarder en local
@@ -162,6 +186,7 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     setUserData(null);
+    setWalletAddress(null);
     setIsAuthenticated(false);
     setAuthMessage("Déconnecté");
     setIsLoading(false);
@@ -175,10 +200,11 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
       const storedUser = localStorage.getItem("pi_user_data");
       const storedToken = localStorage.getItem("pi_access_token");
       
-      if (storedUser && storedToken && !isDevelopment) {
+      if (storedUser && storedToken) {
         try {
           const user = JSON.parse(storedUser);
           setUserData(user);
+          setWalletAddress(user.walletAddress || null);
           setIsAuthenticated(true);
           setAuthMessage("Bienvenue !");
           setIsLoading(false);
@@ -202,14 +228,23 @@ export function PiAuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // ✅ Mettre à jour l'adresse quand userData change
+  useEffect(() => {
+    if (userData?.walletAddress) {
+      setWalletAddress(userData.walletAddress);
+    }
+  }, [userData]);
+
   const value: PiAuthContextType = {
     isAuthenticated,
     isLoading,
     authMessage,
     userData,
+    walletAddress, // ✅ Exposé
     login,
     logout,
     isPiAvailable,
+    refreshWallet, // ✅ Exposé
   };
 
   return <PiAuthContext.Provider value={value}>{children}</PiAuthContext.Provider>;
